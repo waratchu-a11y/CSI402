@@ -1,0 +1,202 @@
+@model IEnumerable<warat_0583_l005.Models.CarModel>
+@{
+    ViewData["Title"] = "รถเช่าทั้งหมด - DriverRent";
+    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+    bool searchPerformed = ViewBag.SearchPerformed is bool searched && searched;
+    string defaultPickupDate = DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    string defaultReturnDate = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+}
+
+<!-- แถบ Header ของหน้าเพจ -->
+<div class="bg-primary text-white py-4 shadow-sm mb-5" style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
+    <div class="container">
+        <h2 class="fw-bold mb-1"><i class="fa-solid fa-cars me-2"></i> ค้นหารถที่ใช่สำหรับคุณ</h2>
+        <p class="text-white-50 m-0">เลือกรถเช่าหลากหลายรุ่นที่ตอบโจทย์ทุกการเดินทาง พร้อมข้อเสนอสุดพิเศษ</p>
+    </div>
+</div>
+
+<div class="container mb-5">
+    @if (ViewBag.SearchError is string searchError)
+    {
+        <div class="alert alert-danger" role="alert">@searchError</div>
+    }
+    @if (searchPerformed && ViewBag.SearchError is null)
+    {
+        <div class="alert alert-info d-flex align-items-center gap-2" role="status">
+            <i class="fa-solid fa-calendar-check"></i>
+            <span>รถว่างสำหรับวันที่ @ViewBag.SearchPickupDate ถึง @ViewBag.SearchReturnDate
+                @if (!string.IsNullOrWhiteSpace(ViewBag.SearchLocation as string))
+                {
+                    <span> — จุดรับรถ @ViewBag.SearchLocation</span>
+                }
+            </span>
+        </div>
+    }
+    <div class="row">
+        <!-- ฝั่งซ้าย: เมนูกรองข้อมูล (Filter) -->
+        <div class="col-lg-3 mb-4">
+            <div class="card shadow-sm border-0" style="border-radius: 15px;">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-2">
+                    <h5 class="fw-bold m-0"><i class="fa-solid fa-filter text-primary me-2"></i> ค้นหาแบบละเอียด</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-controller="Home" asp-action="SearchCars" method="get">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-secondary small">สถานที่รับรถ</label>
+                            <select name="pickupLocation" class="form-select" style="border-radius: 10px;">
+                                <option value="สนามบินดอนเมือง" selected="@(ViewBag.SearchLocation as string == "สนามบินดอนเมือง")">สนามบินดอนเมือง</option>
+                                <option value="สนามบินสุวรรณภูมิ" selected="@(ViewBag.SearchLocation as string == "สนามบินสุวรรณภูมิ")">สนามบินสุวรรณภูมิ</option>
+                                <option value="เชียงใหม่" selected="@(ViewBag.SearchLocation as string == "เชียงใหม่")">เชียงใหม่</option>
+                                <option value="ภูเก็ต" selected="@(ViewBag.SearchLocation as string == "ภูเก็ต")">ภูเก็ต</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-secondary small">วันที่รับรถ</label>
+                            <input id="filterPickupDate" name="pickupDate" type="date"
+                                   value="@(ViewBag.SearchPickupDate ?? defaultPickupDate)"
+                                   min="@DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)"
+                                   class="form-control" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-secondary small">วันที่คืนรถ</label>
+                            <input id="filterReturnDate" name="returnDate" type="date"
+                                   value="@(ViewBag.SearchReturnDate ?? defaultReturnDate)"
+                                   min="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)"
+                                   class="form-control" required />
+                        </div>
+                        <button class="btn btn-primary w-100 fw-bold" style="border-radius: 10px;">
+                            <i class="fa-solid fa-magnifying-glass me-1"></i>ค้นหารถว่าง
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ฝั่งขวา: แสดงรายการรถยนต์ -->
+        <div class="col-lg-9">
+            <!-- แถบจัดเรียง -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <span class="text-muted">@(searchPerformed ? "พบรถว่าง" : "พบรถยนต์ทั้งหมด") <strong>@(Model?.Count() ?? 0)</strong> คัน</span>
+                <!-- 📌 ใส่ id และ onchange เพื่อให้สคริปต์ทำงาน -->
+                <select id="sortSelect" class="form-select form-select-sm w-auto shadow-sm" style="border-radius: 8px;" onchange="sortCars()">
+                    <option value="default">เรียงตาม: แนะนำ</option>
+                    <option value="asc">เรียงตาม: ราคา (ต่ำไปสูง)</option>
+                    <option value="desc">เรียงตาม: ราคา (สูงไปต่ำ)</option>
+                </select>
+            </div>
+
+            <!-- Grid แสดงรถยนต์ (ใส่ id="carList" เพื่อให้สคริปต์จับกลุ่ม) -->
+            <div class="row g-4" id="carList">
+                @if (Model != null && Model.Any())
+                {
+                    foreach (var car in Model)
+                    {
+                        var isAvailable = car.Status == "ว่าง";
+                        <div class="col-md-6 car-item" data-price="@car.PricePerDay">
+                            <div class="card h-100 shadow-sm car-card @(isAvailable ? "" : "opacity-75")" style="border-radius: 20px; border: none; overflow: hidden; transition: all 0.3s ease;">
+                                <a asp-controller="Home" asp-action="CarDetail" asp-route-carName="@car.CarName" class="position-relative overflow-hidden d-block" style="height: 200px;">
+                                    <img src="@car.ImageUrl" class="card-img-top car-img" alt="@car.CarName" style="height: 100%; object-fit: cover; transition: transform 0.5s ease;" onerror="this.src='https://via.placeholder.com/400x220?text=No+Image';">
+                                    <span class="badge @(isAvailable ? "bg-success" : "bg-danger") position-absolute top-0 end-0 m-3 px-3 py-2 shadow-sm rounded-pill z-1">
+                                        <i class="fa-solid @(isAvailable ? "fa-circle-check" : "fa-circle-xmark") me-1"></i>@(isAvailable ? "ว่าง" : "ไม่ว่าง")
+                                    </span>
+                                </a>
+                                <div class="card-body p-4">
+                                    <a asp-controller="Home" asp-action="CarDetail" asp-route-carName="@car.CarName" class="text-decoration-none text-dark">
+                                        <h5 class="card-title fw-bold mb-1 car-title-link">@car.CarName</h5>
+                                    </a>
+                                    <p class="text-muted small mb-3">@car.Details</p>
+                                    <hr class="text-muted opacity-25">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h4 class="text-primary fw-bold m-0">฿@car.PricePerDay.ToString("N0") <span class="fs-6 text-muted fw-normal">/วัน</span></h4>
+                                        @if (isAvailable)
+                                        {
+                                            <a asp-controller="Account" asp-action="Lab52"
+                                               asp-route-UserId="U001" asp-route-CarModel="@car.CarName"
+                                               asp-route-PickupLocation="@(ViewBag.SearchLocation ?? "สนามบินดอนเมือง")"
+                                               asp-route-PickupDate="@(ViewBag.SearchPickupDate ?? defaultPickupDate)"
+                                               asp-route-ReturnDate="@(ViewBag.SearchReturnDate ?? defaultReturnDate)"
+                                               asp-route-RentalDays="@(ViewBag.SearchRentalDays ?? 1)" asp-route-PricePerDay="@car.PricePerDay"
+                                               asp-route-TotalPrice="@car.PricePerDay"
+                                               class="btn btn-warning fw-bold text-dark px-3 py-2 shadow-sm book-btn" style="border-radius: 10px;">
+                                                จองเลย
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-secondary fw-bold px-3 py-2" style="border-radius: 10px;" disabled>ไม่ว่าง</button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="col-12 text-center py-5 text-muted">
+                        <i class="fa-solid fa-car-rear fa-3x mb-3"></i>
+                        <h5>@(searchPerformed ? "ไม่พบรถว่างในช่วงวันที่เลือก" : "ยังไม่มีข้อมูลรถยนต์ในระบบ")</h5>
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    window.addEventListener('DOMContentLoaded', () => {
+        const pickup = document.getElementById('filterPickupDate');
+        const returned = document.getElementById('filterReturnDate');
+
+        function updateReturnDateRange() {
+            if (!pickup.value) return;
+
+            const pickupDate = new Date(`${pickup.value}T00:00:00Z`);
+            const minReturn = new Date(pickupDate);
+            minReturn.setUTCDate(minReturn.getUTCDate() + 1);
+            const maxReturn = new Date(pickupDate);
+            maxReturn.setUTCDate(maxReturn.getUTCDate() + 30);
+            returned.min = minReturn.toISOString().slice(0, 10);
+            returned.max = maxReturn.toISOString().slice(0, 10);
+
+            if (returned.value < returned.min) returned.value = returned.min;
+            if (returned.value > returned.max) returned.value = returned.max;
+        }
+
+        pickup.addEventListener('change', updateReturnDateRange);
+        updateReturnDateRange();
+    });
+</script>
+
+<style>
+    .car-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important; }
+    .car-card:hover .car-img { transform: scale(1.05); }
+    .car-title-link:hover { color: #0d6efd !important; }
+    .book-btn:hover { background-color: #ffca2c !important; transform: scale(1.02); }
+</style>
+
+<!-- 📌 สคริปต์สำหรับจัดเรียงข้อมูลราคา -->
+<script>
+    function sortCars() {
+        const select = document.getElementById('sortSelect');
+        const sortBy = select.value;
+        const container = document.getElementById('carList');
+        const items = Array.from(container.getElementsByClassName('car-item'));
+
+        items.sort((a, b) => {
+            const priceA = parseFloat(a.getAttribute('data-price'));
+            const priceB = parseFloat(b.getAttribute('data-price'));
+
+            if (sortBy === 'asc') {
+                return priceA - priceB; // ราคาต่ำไปสูง
+            } else if (sortBy === 'desc') {
+                return priceB - priceA; // ราคาสูงไปต่ำ
+            } else {
+                return 0; // ค่าเริ่มต้น (แนะนำ)
+            }
+        });
+
+        items.forEach(item => container.appendChild(item));
+    }
+</script>

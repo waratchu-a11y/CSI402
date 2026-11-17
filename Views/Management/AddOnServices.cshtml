@@ -1,0 +1,31 @@
+@model IEnumerable<warat_0583_l005.Models.AddOnServiceModel>
+@{
+    ViewData["Title"] = "จัดการบริการเสริม";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<div class="container my-5">
+    <h2 class="fw-bold mb-3">จัดการบริการเสริม</h2>
+    @if (TempData["ManagementMessage"] is string message) { <div class="alert alert-success">@message</div> }
+    <div class="table-responsive"><table class="table align-middle">
+        <thead><tr><th>รหัส</th><th>บริการ</th><th>ราคา / วัน</th><th>สถานะ</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var service in Model)
+        {
+            <tr>
+                <td>@service.ServiceCode</td>
+                <td><input form="addon-@service.ServiceId" name="serviceName" value="@service.ServiceName" maxlength="150" class="form-control" required /></td>
+                <td><input form="addon-@service.ServiceId" name="pricePerDay" type="number" min="0" step="0.01" value="@service.PricePerDay" class="form-control" required /></td>
+                <td><select form="addon-@service.ServiceId" name="isActive" class="form-select"><option value="true" selected="@service.IsActive">เปิด</option><option value="false" selected="@(!service.IsActive)">ปิด</option></select></td>
+                <td>
+                    <form id="addon-@service.ServiceId" asp-action="UpdateAddOn" method="post">
+                        <input type="hidden" name="serviceId" value="@service.ServiceId" />
+                        <button class="btn btn-sm btn-primary">บันทึก</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+    <a asp-action="Index" class="btn btn-outline-secondary">กลับภาพรวม</a>
+</div>

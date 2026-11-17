@@ -1,0 +1,40 @@
+@model warat_0583_l005.Models.BookingModel
+@{
+    ViewData["Title"] = "ชำระค่าเช่า";
+    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+}
+
+<div class="container my-5">
+    <div class="row justify-content-center"><div class="col-lg-7">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white p-4">
+                <h3 class="fw-bold mb-1">ชำระค่าเช่าด้วยการโอน</h3>
+                <p class="mb-0">Booking #@Model.BookingId — @Model.CarModel</p>
+            </div>
+            <div class="card-body p-4">
+                <div class="alert alert-info">ยอดค่าเช่าคงเหลือ <strong>฿@(((decimal)ViewBag.AmountDue).ToString("N2"))</strong> (ไม่รวมมัดจำที่ชำระแยก)</div>
+                @if (string.IsNullOrWhiteSpace((string?)ViewBag.BankAccount))
+                {
+                    <div class="alert alert-danger">ยังไม่ได้ตั้งค่าบัญชีรับโอน กรุณาติดต่อผู้ดูแลระบบก่อนชำระเงิน</div>
+                }
+                else
+                {
+                    <div class="border rounded p-3 mb-3">
+                        <strong>บัญชีสำหรับโอน</strong>
+                        <div>@ViewBag.BankName</div>
+                        <div>เลขบัญชี: @ViewBag.BankAccount</div>
+                        <div>ชื่อบัญชี: @ViewBag.BankAccountName</div>
+                    </div>
+                }
+                <form asp-action="SubmitRentalPayment" method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="bookingId" value="@Model.BookingId" />
+                    <div class="mb-3"><label class="form-label" for="referenceNumber">เลขอ้างอิงการโอน</label><input id="referenceNumber" name="referenceNumber" class="form-control" maxlength="100" /></div>
+                    <div class="mb-3"><label class="form-label" for="proofFile">รูปสลิป <span class="text-danger">*</span></label><input id="proofFile" name="proofFile" type="file" class="form-control" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required /><div class="form-text">JPG/PNG ไม่เกิน 5 MB</div></div>
+                    <div asp-validation-summary="All" class="text-danger mb-3"></div>
+                    <button class="btn btn-success fw-bold">ส่งหลักฐานให้ฝ่ายการเงิน</button>
+                    <a asp-controller="Home" asp-action="MyBookings" class="btn btn-outline-secondary ms-2">กลับ</a>
+                </form>
+            </div>
+        </div>
+    </div></div>
+</div>

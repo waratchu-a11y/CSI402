@@ -1,0 +1,192 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using warat_0583_l005.Models;
+using warat_0583_l005.Services;
+
+namespace warat_0583_l005.Controllers;
+
+[Authorize]
+public class OperationsController : Controller
+{
+    private readonly Csi402dbContext _db;
+
+    public OperationsController(Csi402dbContext db)
+    {
+        _db = db;
+    }
+
+    [HttpGet]
+    public IActionResult Index()
+    {
+        if (!RoleAccess.HasRole(_db, User, "Employee", "Admin"))
+        {
+            return Forbid();
+        }
+
+        var bookings = _db.Bookings
+            .Where(booking => booking.BookingStatus == "confirmed" || booking.BookingStatus == "rented")
+            .OrderBy(booking => booking.PickupDate)
+            .ToList();
+        ViewBag.LatestInspections = _db.CarInspections
+            .ToList()
+            .GroupBy(inspection => inspection.BookingId)
+            .Select(group => group.OrderByDescending(inspection => inspection.InspectionId).First())
+            .ToDictionary(inspection => inspection.BookingId);
+        return View(bookings);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult ReviewLicense(int bookingId, bool approve, string? note)
+    {
+        if (!RoleAccess.HasRole(_db, User, "Employee", "Admin"))
+        {
+            return Forbid();
+        }
+
+        var booking = _db.Bookings.FirstOrDefault(item => item.BookingId == bookingId);
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        if (booking.BookingStatus != "confirmed" || booking.LicenseImagePath is null)
+        {
+            return Conflict("ไม่พบใบขับขี่หรือรายการจองยังไม่พร้อมตรวจสอบ");
+        }
+
+        booking.LicenseStatus = approve ? "approved" : "rejected";
+        booking.LicenseReviewNote = approve || string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        _db.SaveChanges();
+        TempData["OperationsMessage"] = approve ? "ตรวจสอบใบขับขี่เรียบร้อย" : "ปฏิเสธใบขับขี่แล้ว";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult Pickup(int bookingId, int mileage, int fuelLevel, string? conditionNotes)
+    {
+        if (!RoleAccess.HasRole(_db, User, "Employee", "Admin"))
+        {
+            return Forbid();
+        }
+
+        var booking = _db.Bookings.FirstOrDefault(item => item.BookingId == bookingId);
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        if (booking.BookingStatus != "confirmed" || booking.LicenseStatus != "approved" || booking.CarId is null)
+        {
+            return Conflict("ต้องยืนยันมัดจำและตรวจใบขับขี่ก่อนส่งมอบรถ");
+        }
+
+        bool depositVerified = _db.Payments.Any(payment =>
+            payment.BookingId == bookingId &&
+            payment.PaymentType == "deposit" &&
+            payment.PaymentStatus == "verified");
+        decimal rentalPaid = _db.Payments
+            .Where(payment => payment.BookingId == bookingId &&
+                payment.PaymentType == "rental" &&
+                payment.PaymentStatus == "verified")
+            .Sum(payment => (decimal?)payment.Amount) ?? 0m;
+        int previousMileage = _db.CarInspections
+            .Where(inspection => inspection.CarId == booking.CarId)
+            .Select(inspection => (int?)inspection.Mileage)
+            .Max() ?? 0;
+        if (!depositVerified || rentalPaid < booking.TotalPrice ||
+            mileage < previousMileage || fuelLevel is < 0 or > 100 ||
+            conditionNotes?.Length > 2000)
+        {
+            return BadRequest("ข้อมูลรับรถไม่ถูกต้อง ต้องตรวจสอบมัดจำและค่าเช่าครบก่อนส่งมอบ พร้อมตรวจเลขไมล์และระดับน้ำมัน");
+        }
+
+        _db.CarInspections.Add(new CarInspectionModel
+        {
+            BookingId = bookingId,
+            CarId = booking.CarId.Value,
+            InspectionStage = "before_pickup",
+            Mileage = mileage,
+            FuelLevel = fuelLevel,
+            ConditionNotes = conditionNotes?.Trim(),
+            InspectedBy = User.Identity?.Name ?? string.Empty,
+            InspectedAt = DateTime.Now
+        });
+        booking.BookingStatus = "rented";
+        _db.SaveChanges();
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult Return(int bookingId, int mileage, int fuelLevel, decimal damageAmount, string? conditionNotes)
+    {
+        if (!RoleAccess.HasRole(_db, User, "Employee", "Admin"))
+        {
+            return Forbid();
+        }
+
+        var booking = _db.Bookings.FirstOrDefault(item => item.BookingId == bookingId);
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        var pickupInspection = _db.CarInspections
+            .Where(inspection => inspection.BookingId == bookingId && inspection.InspectionStage == "before_pickup")
+            .OrderByDescending(inspection => inspection.InspectionId)
+            .FirstOrDefault();
+        if (booking.BookingStatus != "rented" || booking.CarId is null || pickupInspection is null)
+        {
+            return Conflict("ไม่พบการส่งมอบรถที่ยังรอรับคืน");
+        }
+
+        if (mileage < pickupInspection.Mileage || fuelLevel is < 0 or > 100 ||
+            damageAmount < 0 || damageAmount > 99999999m ||
+            conditionNotes?.Length > 2000)
+        {
+            return BadRequest("ข้อมูลคืนรถไม่ถูกต้อง เลขไมล์และค่าความเสียหายต้องอยู่ในช่วงที่กำหนด");
+        }
+
+        var car = _db.Cars.FirstOrDefault(item => item.CarId == booking.CarId);
+        if (car is null)
+        {
+            return NotFound("ไม่พบข้อมูลรถ");
+        }
+
+        _db.CarInspections.Add(new CarInspectionModel
+        {
+            BookingId = bookingId,
+            CarId = car.CarId,
+            InspectionStage = "after_return",
+            Mileage = mileage,
+            FuelLevel = fuelLevel,
+            ConditionNotes = conditionNotes?.Trim(),
+            DamageAmount = damageAmount,
+            InspectedBy = User.Identity?.Name ?? string.Empty,
+            InspectedAt = DateTime.Now
+        });
+        booking.BookingStatus = "completed";
+        car.Status = damageAmount > 0 ? "อยู่ระหว่างซ่อม" : "ว่าง";
+        if (damageAmount > 0)
+        {
+            _db.MaintenanceRecords.Add(new MaintenanceModel
+            {
+                CarId = car.CarId,
+                BookingId = bookingId,
+                IssueDescription = conditionNotes?.Trim() is { Length: > 0 } notes
+                    ? notes
+                    : "ความเสียหายจากการตรวจรับคืนรถ",
+                RepairCost = damageAmount,
+                MaintenanceStatus = "reported",
+                ReportedBy = User.Identity?.Name ?? string.Empty,
+                CreatedAt = DateTime.Now
+            });
+        }
+
+        _db.SaveChanges();
+        TempData["OperationsMessage"] = "รับคืนรถและบันทึกผลตรวจสภาพแล้ว ฝ่ายการเงินสามารถดำเนินการคืนมัดจำ";
+        return RedirectToAction(nameof(Index));
+    }
+}

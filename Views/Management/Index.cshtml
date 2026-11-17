@@ -1,0 +1,33 @@
+@{
+    ViewData["Title"] = "จัดการระบบ";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var payments = (List<warat_0583_l005.Models.PaymentModel>)ViewBag.RecentPayments;
+}
+
+<div class="container my-5">
+    <h2 class="fw-bold mb-4">ภาพรวมผู้จัดการ</h2>
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card card-body"><span>รถทั้งหมด</span><strong class="fs-3">@ViewBag.CarCount</strong></div></div>
+        <div class="col-md-3"><div class="card card-body"><span>การจองทั้งหมด</span><strong class="fs-3">@ViewBag.BookingCount</strong></div></div>
+        <div class="col-md-3"><div class="card card-body"><span>รายการกำลังดำเนินการ</span><strong class="fs-3">@ViewBag.ActiveBookingCount</strong></div></div>
+        <div class="col-md-3"><div class="card card-body"><span>ผู้ใช้งาน</span><strong class="fs-3">@ViewBag.UserCount</strong></div></div>
+    </div>
+    <div class="alert alert-success">ยอดรับสุทธิจากรายการที่บันทึก: ฿@(((decimal)ViewBag.NetReceived).ToString("N2"))</div>
+    <div class="d-flex gap-2 mb-4">
+        <a asp-controller="Admin" asp-action="CarManagement" class="btn btn-primary">จัดการรถและราคา</a>
+        <a asp-action="Promotions" class="btn btn-outline-primary">จัดการโปรโมชั่น</a>
+        <a asp-action="AddOnServices" class="btn btn-outline-success">จัดการบริการเสริม</a>
+        @if (User.IsInRole("Admin")) { <a asp-action="Settings" class="btn btn-outline-dark">ตั้งค่าบัญชีรับโอน</a> }
+        @if (User.IsInRole("Admin") || User.IsInRole("Manager")) { <a asp-action="Users" class="btn btn-outline-dark">ผู้ใช้และสิทธิ์</a> }
+    </div>
+    <h4>รายการรับ-จ่ายล่าสุด</h4>
+    <div class="table-responsive"><table class="table">
+        <thead><tr><th>วันเวลา</th><th>Booking</th><th>ประเภท</th><th>สถานะ</th><th>ยอด</th></tr></thead>
+        <tbody>
+        @foreach (var payment in payments)
+        {
+            <tr><td>@payment.CreatedAt.ToString("g")</td><td>#@payment.BookingId</td><td>@payment.PaymentType</td><td>@payment.PaymentStatus</td><td>฿@payment.Amount.ToString("N2")</td></tr>
+        }
+        </tbody>
+    </table></div>
+</div>

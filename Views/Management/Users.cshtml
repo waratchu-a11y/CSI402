@@ -1,0 +1,35 @@
+@model IEnumerable<warat_0583_l005.Models.UserModel>
+@{
+    ViewData["Title"] = "จัดการผู้ใช้งาน";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var roles = (string[])ViewBag.AvailableRoles;
+}
+
+<div class="container my-5">
+    <h2 class="fw-bold mb-3">จัดการผู้ใช้งานและสิทธิ์</h2>
+    @if (TempData["ManagementMessage"] is string message) { <div class="alert alert-success">@message</div> }
+    <div class="table-responsive"><table class="table align-middle">
+        <thead><tr><th>ผู้ใช้</th><th>อีเมล</th><th>เบอร์โทร</th><th>สิทธิ์ / สถานะ</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var user in Model)
+        {
+            <tr>
+                <td>@user.Username (#@user.Id)</td><td>@user.Email</td><td>@user.Phone</td>
+                <td>
+                    <form asp-action="UpdateUser" method="post" class="d-flex gap-2">
+                        <input type="hidden" name="userId" value="@user.Id" />
+                        <select name="role" class="form-select form-select-sm">
+                            @foreach (var role in roles) { <option value="@role" selected="@(user.Role == role)">@role</option> }
+                        </select>
+                        <select name="isActive" class="form-select form-select-sm">
+                            <option value="true" selected="@user.IsActive">ใช้งาน</option>
+                            <option value="false" selected="@(!user.IsActive)">ปิดใช้งาน</option>
+                        </select>
+                        <button class="btn btn-sm btn-primary">บันทึก</button>
+                    </form>
+                </td><td></td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+</div>

@@ -1,0 +1,154 @@
+@{
+    ViewData["Title"] = "ยืนยันการจองรถ - DriverRent";
+    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+
+    // คำนวณวันคืนรถจากวันที่รับรถ + จำนวนวันเช่า
+    DateTime pickupDt;
+    bool isParsed = DateTime.TryParseExact(
+        ViewBag.PickupDate?.ToString(),
+        "yyyy-MM-dd",
+        System.Globalization.CultureInfo.InvariantCulture,
+        System.Globalization.DateTimeStyles.None,
+        out pickupDt);
+    string returnDate = ViewBag.ReturnDate ?? (isParsed
+        ? pickupDt.AddDays(ViewBag.RentalDays ?? 1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+        : "-");
+}
+
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-lg border-0" style="border-radius: 20px; overflow: hidden;">
+                <!-- Header -->
+                <div class="bg-primary text-white p-4 text-center" style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
+                    <h3 class="fw-bold m-0"><i class="fa-solid fa-clipboard-check me-2"></i> สรุปและยืนยันการจองรถ</h3>
+                    <p class="text-white-50 small m-0 mt-1">กรุณาตรวจสอบข้อมูลการเช่ารถของคุณก่อนยืนยันรายการ</p>
+                </div>
+
+                <div class="card-body p-5">
+                    <!-- ข้อมูลผู้เช่า -->
+                    <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4">
+                        <div>
+                            <span class="text-muted small d-block">ชื่อผู้ทำรายการจอง:</span>
+                            <h5 class="fw-bold text-dark m-0"><i class="fa-solid fa-user-circle text-primary me-2"></i>@ViewBag.UserId</h5>
+                        </div>
+                        <span class="badge bg-warning text-dark px-3 py-2 rounded-pill fs-6 fw-bold">
+                            <i class="fa-solid fa-hourglass-half me-1"></i> รอการยืนยัน
+                        </span>
+                    </div>
+
+                    <!-- สรุปรายละเอียดการเช่า -->
+                    <div class="row g-4 mb-4">
+                        <!-- สรุปรถ -->
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded-3 h-100 border">
+                                <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-car text-primary me-2"></i> ข้อมูลรถยนต์</h6>
+                                <p class="mb-1 text-muted small">รุ่นรถที่เลือก:</p>
+                                <h5 class="fw-bold text-primary mb-2">@ViewBag.CarModel</h5>
+                                <p class="mb-1 text-muted small">ระบบเกียร์ / จำนวนที่นั่ง:</p>
+                                <p class="fw-bold text-dark mb-2">@(ViewBag.TransmissionType == "automatic" ? "อัตโนมัติ" : ViewBag.TransmissionType == "manual" ? "ธรรมดา" : "ไม่ระบุ") / @(ViewBag.Seats ?? "ไม่ระบุ") ที่นั่ง</p>
+                                <p class="mb-0 text-muted small">อัตราค่าเช่า: <strong class="text-dark">฿@ViewBag.PricePerDay?.ToString("N0") / วัน</strong></p>
+                            </div>
+                        </div>
+
+                        <!-- สรุปสถานที่และวันเช่า -->
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded-3 h-100 border">
+                                <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-calendar-days text-primary me-2"></i> กำหนดการเดินทาง</h6>
+                                <p class="mb-1 text-muted small">สถานที่รับรถ / คืนรถ:</p>
+                                <p class="fw-bold text-dark mb-2"><i class="fa-solid fa-location-dot text-danger me-1"></i> @ViewBag.PickupLocation / @ViewBag.ReturnLocation</p>
+                                
+                                <p class="mb-1 text-muted small">วันที่รับรถ - วันที่คืนรถ:</p>
+                                <p class="fw-bold text-dark mb-0">
+                                    @ViewBag.PickupDate <span class="text-primary mx-1">ถึง</span> @returnDate
+                                </p>
+                                <p class="mb-0 mt-2 text-muted small">เวลารับรถ / คืนรถ: <strong class="text-dark">@ViewBag.PickupTime / @ViewBag.ReturnTime</strong></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ตารางคำนวณราคาทั้งหมด -->
+                    <div class="table-responsive mb-4">
+                        <table class="table align-middle border">
+                            <thead class="table-light text-secondary small">
+                                <tr>
+                                    <th class="py-3 px-3">รายการ</th>
+                                    <th class="py-3 text-center">จำนวนวัน</th>
+                                    <th class="py-3 text-end">ราคาต่อวัน</th>
+                                    <th class="py-3 text-end px-3">ราคารวม</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="py-3 px-3 fw-bold text-dark">ค่าเช่ารถยนต์ @ViewBag.CarModel</td>
+                                    <td class="text-center fw-bold">@ViewBag.RentalDays วัน</td>
+                                    <td class="text-end">฿@ViewBag.PricePerDay?.ToString("N0")</td>
+                                    <td class="text-end fw-bold text-dark px-3">฿@(((decimal)ViewBag.PricePerDay * (int)ViewBag.RentalDays).ToString("N0"))</td>
+                                </tr>
+                                @if ((decimal)ViewBag.AddonTotal > 0)
+                                {
+                                    <tr>
+                                        <td class="py-3 px-3 fw-bold text-dark">บริการเสริม</td>
+                                        <td class="text-center fw-bold">@ViewBag.RentalDays วัน</td>
+                                        <td class="text-end">-</td>
+                                        <td class="text-end fw-bold text-dark px-3">฿@(((decimal)ViewBag.AddonTotal).ToString("N0"))</td>
+                                    </tr>
+                                }
+                                @if ((decimal)ViewBag.DiscountAmount > 0)
+                                {
+                                    <tr>
+                                        <td class="py-3 px-3 fw-bold text-success">ส่วนลด @(ViewBag.PromotionName ?? "โปรโมชั่น")</td>
+                                        <td class="text-center">-</td>
+                                        <td class="text-end">@(ViewBag.PromotionCode ?? "")</td>
+                                        <td class="text-end fw-bold text-success px-3">-฿@(((decimal)ViewBag.DiscountAmount).ToString("N2"))</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot class="table-light border-top">
+                                <tr>
+                                    <td colspan="3" class="text-end pt-3 fs-5 fw-bold text-secondary">ค่าเช่ารวม:</td>
+                                    <td class="text-end pt-3 fs-3 fw-bold text-success px-3">฿@ViewBag.TotalPrice?.ToString("N0")</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3" class="text-end pt-2 fw-bold text-secondary">มัดจำที่ต้องชำระ (10%):</td>
+                                    <td class="text-end pt-2 fw-bold text-warning px-3">฿@(((decimal)ViewBag.DepositAmount).ToString("N2"))</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- ฟอร์มสำหรับกดยืนยันการจอง -->
+                    <form asp-action="ConfirmBookingPost" method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="carModel" value="@ViewBag.CarModel" />
+                        <input type="hidden" name="pickupLocation" value="@ViewBag.PickupLocation" />
+                        <input type="hidden" name="returnLocation" value="@ViewBag.ReturnLocation" />
+                        <input type="hidden" name="pickupDate" value="@ViewBag.PickupDate" />
+                        <input type="hidden" name="returnDate" value="@ViewBag.ReturnDate" />
+                        <input type="hidden" name="pickupTime" value="@ViewBag.PickupTime" />
+                        <input type="hidden" name="returnTime" value="@ViewBag.ReturnTime" />
+                        <input type="hidden" name="rentalDays" value="@ViewBag.RentalDays" />
+                        <input type="hidden" name="promotionId" value="@ViewBag.PromotionId" />
+                        <input type="hidden" name="promotionCode" value="@ViewBag.PromotionCode" />
+                        <input type="hidden" name="hasInsurance" value="@ViewBag.HasInsurance" />
+                        <input type="hidden" name="hasBabySeat" value="@ViewBag.HasBabySeat" />
+
+                        <div class="mb-4">
+                            <label for="licenseImage" class="form-label fw-bold">แนบรูปใบขับขี่ <span class="text-danger">*</span></label>
+                            <input id="licenseImage" name="licenseImage" type="file" class="form-control" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
+                            <div class="form-text">รองรับ JPG/PNG ขนาดไม่เกิน 5 MB และเก็บเป็นไฟล์ส่วนตัว</div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <a href="javascript:history.back()" class="btn btn-outline-secondary px-4 py-2 fw-bold" style="border-radius: 12px;">
+                                <i class="fa-solid fa-pen-to-square me-1"></i> ย้อนกลับไปแก้ไข
+                            </a>
+                            <button type="submit" class="btn btn-success px-5 py-2 fw-bold fs-5 shadow-sm" style="border-radius: 12px;">
+                                <i class="fa-solid fa-circle-check me-2"></i> ยืนยันการจองรถ
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

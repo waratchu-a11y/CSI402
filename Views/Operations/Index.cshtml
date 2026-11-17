@@ -1,0 +1,76 @@
+@model IEnumerable<warat_0583_l005.Models.BookingModel>
+@using warat_0583_l005.Models
+@{
+    ViewData["Title"] = "งานรับ-คืนรถ";
+    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+    var latestInspections = (Dictionary<int, CarInspectionModel>)ViewBag.LatestInspections;
+}
+
+<div class="container my-5">
+    <h2 class="fw-bold mb-3">คิวงานรับ-คืนรถ</h2>
+    @if (TempData["OperationsMessage"] is string message)
+    {
+        <div class="alert alert-success">@message</div>
+    }
+    @foreach (var booking in Model)
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between">
+                <strong>Booking #@booking.BookingId — @booking.CarModel</strong>
+                <span>@booking.BookingStatus / ใบขับขี่: @booking.LicenseStatus</span>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">ลูกค้า: @booking.UserId | รับ @booking.PickupDate @booking.PickupTime — คืน @booking.ReturnDate?.ToString("yyyy-MM-dd") @booking.ReturnTime</p>
+                <a asp-controller="Payment" asp-action="License" asp-route-bookingId="@booking.BookingId" target="_blank" rel="noopener">เปิดรูปใบขับขี่</a>
+                @if (booking.LicenseStatus == "rejected" && !string.IsNullOrWhiteSpace(booking.LicenseReviewNote))
+                {
+                    <p class="text-danger mt-2 mb-0">เหตุผลที่ไม่ผ่าน: @booking.LicenseReviewNote</p>
+                }
+                @if (latestInspections.TryGetValue(booking.BookingId, out var inspection))
+                {
+                    <p class="text-muted mt-2 mb-0">ผลตรวจล่าสุด: @inspection.InspectionStage, เลขไมล์ @inspection.Mileage กม., น้ำมัน @inspection.FuelLevel%</p>
+                }
+
+                @if (booking.BookingStatus == "confirmed")
+                {
+                    @if (booking.LicenseStatus is "pending" or "rejected")
+                    {
+                        <form asp-action="ReviewLicense" method="post" class="row g-2 align-items-center mt-3">
+                            <input type="hidden" name="bookingId" value="@booking.BookingId" />
+                            <div class="col-md-6"><input name="note" class="form-control" maxlength="500" placeholder="เหตุผลกรณีไม่ผ่าน" /></div>
+                            <div class="col-auto">
+                                <button name="approve" value="true" class="btn btn-success">ยืนยันใบขับขี่</button>
+                                <button name="approve" value="false" class="btn btn-outline-danger">ปฏิเสธ</button>
+                            </div>
+                        </form>
+                    }
+                    @if (booking.LicenseStatus == "approved")
+                    {
+                        <form asp-action="Pickup" method="post" class="row g-2 align-items-end mt-3">
+                            <input type="hidden" name="bookingId" value="@booking.BookingId" />
+                            <div class="col-sm-3"><label class="form-label">เลขไมล์ส่งมอบ</label><input name="mileage" type="number" min="0" class="form-control" required /></div>
+                            <div class="col-sm-3"><label class="form-label">น้ำมัน (%)</label><input name="fuelLevel" type="number" min="0" max="100" class="form-control" required /></div>
+                            <div class="col-sm-4"><label class="form-label">สภาพ/ตำหนิ</label><input name="conditionNotes" maxlength="2000" class="form-control" /></div>
+                            <div class="col-sm-2"><button class="btn btn-primary w-100">บันทึกส่งมอบ</button></div>
+                        </form>
+                    }
+                }
+                else if (booking.BookingStatus == "rented")
+                {
+                    <form asp-action="Return" method="post" class="row g-2 align-items-end mt-3">
+                        <input type="hidden" name="bookingId" value="@booking.BookingId" />
+                        <div class="col-sm-2"><label class="form-label">เลขไมล์คืน</label><input name="mileage" type="number" min="0" class="form-control" required /></div>
+                        <div class="col-sm-2"><label class="form-label">น้ำมัน (%)</label><input name="fuelLevel" type="number" min="0" max="100" class="form-control" required /></div>
+                        <div class="col-sm-3"><label class="form-label">ค่าความเสียหาย</label><input name="damageAmount" type="number" min="0" step="0.01" value="0" class="form-control" required /></div>
+                        <div class="col-sm-3"><label class="form-label">สภาพ/ตำหนิ</label><input name="conditionNotes" maxlength="2000" class="form-control" /></div>
+                        <div class="col-sm-2"><button class="btn btn-warning w-100">บันทึกรับคืน</button></div>
+                    </form>
+                }
+            </div>
+        </div>
+    }
+    @if (!Model.Any())
+    {
+        <div class="alert alert-light">ไม่มีรายการนัดรับรถหรือรถที่รอรับคืน</div>
+    }
+</div>

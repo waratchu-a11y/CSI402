@@ -1,0 +1,78 @@
+@model IEnumerable<warat_0583_l005.Models.MaintenanceModel>
+@using warat_0583_l005.Models
+@{
+    ViewData["Title"] = "ตรวจสภาพและซ่อมบำรุง";
+    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+    var cars = (List<CarModel>)ViewBag.Cars;
+    var inspections = (List<CarInspectionModel>)ViewBag.Inspections;
+}
+
+<div class="container my-5">
+    <h2 class="fw-bold mb-4">ทีมเซอร์วิส — ตรวจสภาพและซ่อมบำรุง</h2>
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-bold">แจ้งซ่อม / แจ้งปัญหารถ</div>
+        <div class="card-body">
+            <form asp-action="ReportIssue" method="post" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">รถ</label>
+                    <select name="carId" class="form-select" required>
+                        @foreach (var car in cars) { <option value="@car.CarId">@car.CarName (#@car.CarId)</option> }
+                    </select>
+                </div>
+                <div class="col-md-2"><label class="form-label">รหัสจอง (ถ้ามี)</label><input name="bookingId" type="number" min="1" class="form-control" /></div>
+                <div class="col-md-4"><label class="form-label">รายละเอียดปัญหา</label><input name="issueDescription" maxlength="2000" class="form-control" required /></div>
+                <div class="col-md-2"><label class="form-label">ประมาณค่าซ่อม</label><input name="repairCost" type="number" min="0" step="0.01" value="0" class="form-control" required /></div>
+                <div class="col-md-1 d-flex align-items-end"><button class="btn btn-primary">บันทึก</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-bold">ประวัติการซ่อมบำรุง</div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>วันแจ้ง</th><th>รถ / รายการ</th><th>ค่าซ่อม</th><th>สถานะ</th><th>ปรับปรุง</th></tr></thead>
+                <tbody>
+                @foreach (var record in Model)
+                {
+                    <tr>
+                        <td>@record.CreatedAt.ToString("g")</td>
+                        <td>#@record.CarId / @record.IssueDescription</td>
+                        <td>฿@record.RepairCost.ToString("N2")</td>
+                        <td>@record.MaintenanceStatus</td>
+                        <td>
+                            <form asp-action="UpdateMaintenance" method="post" class="d-flex gap-2">
+                                <input type="hidden" name="maintenanceId" value="@record.MaintenanceId" />
+                                <input name="repairCost" type="number" min="0" step="0.01" value="@record.RepairCost" class="form-control form-control-sm" />
+                                <select name="status" class="form-select form-select-sm">
+                                    <option value="reported" selected="@(record.MaintenanceStatus == "reported")">แจ้งแล้ว</option>
+                                    <option value="in_progress" selected="@(record.MaintenanceStatus == "in_progress")">กำลังซ่อม</option>
+                                    <option value="completed" selected="@(record.MaintenanceStatus == "completed")">เสร็จแล้ว</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-primary">บันทึก</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Any()) { <tr><td colspan="5" class="text-center text-muted py-3">ยังไม่มีประวัติซ่อม</td></tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header fw-bold">ประวัติผลตรวจสภาพรถ</div>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Booking</th><th>ขั้นตอน</th><th>เลขไมล์</th><th>น้ำมัน</th><th>ความเสียหาย</th><th>พนักงาน</th><th>เวลา</th></tr></thead>
+                <tbody>
+                @foreach (var inspection in inspections)
+                {
+                    <tr><td>#@inspection.BookingId</td><td>@inspection.InspectionStage</td><td>@inspection.Mileage กม.</td><td>@inspection.FuelLevel%</td><td>฿@inspection.DamageAmount.ToString("N2")</td><td>@inspection.InspectedBy</td><td>@inspection.InspectedAt.ToString("g")</td></tr>
+                }
+                @if (inspections.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-3">ยังไม่มีผลตรวจ</td></tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

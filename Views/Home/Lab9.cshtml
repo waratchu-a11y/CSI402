@@ -1,0 +1,42 @@
+@model warat_0583_l005.Models.UserModel
+
+@{
+    ViewData["Title"] = "Lab9 - Add User";
+}
+
+<div class="container mt-4">
+    <h2>เพิ่มข้อมูลผู้ใช้งาน (Lab9)</h2>
+
+    <!-- เพิ่มโค้ดแสดงข้อความแจ้งเตือนตรงนี้ -->
+    @if (ViewBag.Status != null)
+    {
+        <div class="alert alert-danger mt-3" role="alert">
+            @ViewBag.Status
+        </div>
+    }
+
+    <form asp-action="Lab9" asp-controller="Home" method="post" class="mt-3">
+        <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text" asp-for="Username" class="form-control" required />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input type="password" asp-for="Password" class="form-control" required />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" asp-for="Email" class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Phone</label>
+            <input type="text" asp-for="Phone" class="form-control" />
+        </div>
+
+        <button type="submit" class="btn btn-primary">บันทึกข้อมูล</button>
+        <a asp-action="Lab9_1" class="btn btn-secondary">ดูรายชื่อทั้งหมด</a>
+    </form>
+</div>

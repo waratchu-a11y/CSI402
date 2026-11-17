@@ -1,0 +1,58 @@
+@model warat_0583_l005.Models.BookingModel
+@{
+    ViewData["Title"] = "ส่งหลักฐานโอนเงิน";
+    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+}
+
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white p-4">
+                    <h3 class="fw-bold mb-1">ชำระเงินมัดจำด้วยการโอน</h3>
+                    <p class="mb-0">การจอง #@Model.BookingId — รอตรวจสอบหลังส่งหลักฐาน</p>
+                </div>
+                <div class="card-body p-4">
+                    @if (ViewBag.RejectedPayment is warat_0583_l005.Models.PaymentModel rejected)
+                    {
+                        <div class="alert alert-warning">
+                            หลักฐานก่อนหน้าถูกปฏิเสธ: @(rejected.Note ?? "กรุณาตรวจสอบข้อมูลแล้วส่งใหม่")
+                        </div>
+                    }
+                    <div class="alert alert-info">
+                        กรุณาโอน <strong>฿@Model.DepositAmount.ToString("N2")</strong> เป็นเงินมัดจำ 10%
+                        จากนั้นแนบรูปสลิปให้ฝ่ายการเงินตรวจสอบ
+                    </div>
+                    @if (string.IsNullOrWhiteSpace((string?)ViewBag.BankAccount))
+                    {
+                        <div class="alert alert-danger">ยังไม่ได้ตั้งค่าบัญชีรับโอน กรุณาติดต่อผู้ดูแลระบบก่อนชำระเงิน</div>
+                    }
+                    else
+                    {
+                        <div class="border rounded p-3 mb-3">
+                            <strong>บัญชีสำหรับโอน</strong>
+                            <div>@ViewBag.BankName</div>
+                            <div>เลขบัญชี: @ViewBag.BankAccount</div>
+                            <div>ชื่อบัญชี: @ViewBag.BankAccountName</div>
+                        </div>
+                    }
+                    <form asp-action="SubmitDeposit" method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="bookingId" value="@Model.BookingId" />
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="referenceNumber">เลขอ้างอิงการโอน (ถ้ามี)</label>
+                            <input id="referenceNumber" name="referenceNumber" class="form-control" maxlength="100" />
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold" for="proofFile">รูปสลิปโอนเงิน <span class="text-danger">*</span></label>
+                            <input id="proofFile" name="proofFile" type="file" class="form-control" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
+                            <div class="form-text">JPG/PNG ไม่เกิน 5 MB</div>
+                        </div>
+                        <div asp-validation-summary="All" class="text-danger mb-3"></div>
+                        <button class="btn btn-success fw-bold" type="submit">ส่งหลักฐานให้ฝ่ายการเงิน</button>
+                        <a asp-controller="Home" asp-action="MyBookings" class="btn btn-outline-secondary ms-2">กลับรายการจอง</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

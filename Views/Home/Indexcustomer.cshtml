@@ -1,0 +1,173 @@
+﻿@model IEnumerable<warat_0583_l005.Models.CarModel>
+@{
+    ViewData["Title"] = "หน้าแรก - DriverRent";
+    // เรียกใช้ Layout สำหรับฝั่งลูกค้า
+    Layout = "~/Views/Shared/_CustomerLayout.cshtml"; 
+}
+
+<!-- ส่วน Hero Banner และ ฟอร์มค้นหา -->
+<div class="hero-section text-white py-5 mb-5 shadow" style="border-radius: 0 0 40px 40px; margin-top: -16px; background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); position: relative; overflow: hidden;">
+    <!-- วงกลมตกแต่งพื้นหลังเพิ่มมิติ -->
+    <div class="position-absolute" style="top: -50px; right: -50px; width: 250px; height: 250px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+    <div class="position-absolute" style="bottom: -80px; left: -50px; width: 300px; height: 300px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
+
+    <div class="container text-center mt-4 position-relative z-1">
+        <span class="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bold mb-3 shadow-sm">
+            <i class="fa-solid fa-car-side me-1"></i> บริการเช่ารถอันดับ 1 ของคุณ
+        </span>
+        <h1 class="display-3 fw-bold mb-2">ค้นหารถเช่าที่เหมาะกับคุณ</h1>
+        <p class="fs-5 text-white-50">จองง่าย จ่ายสะดวก พร้อมออกเดินทางได้ทันที ตลอด 24 ชั่วโมง</p>
+
+        <!-- ฟอร์มค้นหารถ (Interactive Card) -->
+        <div class="card p-4 shadow-lg mt-4 mx-auto text-dark search-card" style="max-width: 950px; border-radius: 20px; border: none; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);">
+            <!-- 📌 เพิ่ม Form tag ครอบตรงนี้ -->
+            <form asp-controller="Home" asp-action="SearchCars" method="get">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4 text-start">
+                        <label class="form-label fw-bold text-secondary small"><i class="fa-solid fa-location-dot text-primary me-1"></i> สถานที่รับรถ</label>
+                        <!-- 📌 เพิ่ม name="pickupLocation" -->
+                        <select name="pickupLocation" class="form-select form-select-lg border-2 shadow-none" style="border-radius: 12px; font-size: 1rem;">
+                            <option value="สนามบินดอนเมือง">สนามบินดอนเมือง</option>
+                            <option value="สนามบินสุวรรณภูมิ">สนามบินสุวรรณภูมิ</option>
+                            <option value="เชียงใหม่">เชียงใหม่</option>
+                            <option value="ภูเก็ต">ภูเก็ต</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 text-start">
+                        <label class="form-label fw-bold text-secondary small"><i class="fa-regular fa-calendar-days text-primary me-1"></i> วันที่รับรถ</label>
+                        <!-- 📌 เพิ่ม name="pickupDate" -->
+                        <input id="searchPickupDate" type="date" name="pickupDate" min="@DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" value="@DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-lg border-2 shadow-none" style="border-radius: 12px; font-size: 1rem;" required />
+                    </div>
+                    <div class="col-md-3 text-start">
+                        <label class="form-label fw-bold text-secondary small"><i class="fa-regular fa-calendar-check text-primary me-1"></i> วันที่คืนรถ</label>
+                        <!-- 📌 เพิ่ม name="returnDate" -->
+                        <input id="searchReturnDate" type="date" name="returnDate" min="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" value="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-lg border-2 shadow-none" style="border-radius: 12px; font-size: 1rem;" required />
+                    </div>
+                    <div class="col-md-2">
+                        <!-- 📌 เพิ่ม type="submit" ให้ปุ่มทำงานได้ -->
+                        <button type="submit" class="btn btn-warning btn-lg w-100 fw-bold text-dark shadow-sm search-btn" style="border-radius: 12px; height: 48px;">
+                            <i class="fa-solid fa-magnifying-glass me-1"></i> ค้นหา
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ส่วนแสดงรถเช่ายอดนิยม -->
+<div class="container mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold m-0"><i class="fa-solid fa-fire text-danger me-2"></i>รถเช่ายอดนิยม</h3>
+            <p class="text-muted small m-0 mt-1">คัดสรรรถยนต์คุณภาพดี พร้อมให้คุณโลดแล่นไปทุกเส้นทาง</p>
+        </div>
+        <a href="~/Home/AllCars" class="text-decoration-none fw-bold text-primary view-all-link">ดูรถทั้งหมด <i class="fa-solid fa-arrow-right ms-1"></i></a>
+    </div>
+
+    <div class="row g-4">
+        @if (Model != null && Model.Any())
+        {
+            foreach (var car in Model)
+            {
+                var isAvailable = car.Status == "ว่าง";
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm car-card @(isAvailable ? "" : "opacity-75")" style="border-radius: 20px; border: none; overflow: hidden; transition: all 0.3s ease;">
+                        <a asp-controller="Home" asp-action="CarDetail" asp-route-carName="@car.CarName" class="position-relative overflow-hidden d-block" style="height: 220px;">
+                            <img src="@car.ImageUrl" class="card-img-top car-img" alt="@car.CarName" style="height: 100%; object-fit: cover; transition: transform 0.5s ease;" onerror="this.src='https://via.placeholder.com/400x220?text=No+Image';">
+                            <span class="badge @(isAvailable ? "bg-success" : "bg-danger") position-absolute top-0 end-0 m-3 px-3 py-2 shadow-sm rounded-pill z-1">
+                                <i class="fa-solid @(isAvailable ? "fa-circle-check" : "fa-circle-xmark") me-1"></i>@(isAvailable ? "พร้อมใช้งาน" : "ไม่ว่าง")
+                            </span>
+                        </a>
+                        <div class="card-body p-4">
+                            <a asp-controller="Home" asp-action="CarDetail" asp-route-carName="@car.CarName" class="text-decoration-none text-dark">
+                                <h5 class="card-title fw-bold mb-1 car-title-link">@car.CarName</h5>
+                            </a>
+                            <p class="text-muted small mb-3">@car.Details</p>
+                            <hr class="text-muted opacity-25">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="text-muted small d-block">ราคาเริ่มต้น</span>
+                                    <h4 class="text-primary fw-bold m-0">฿@car.PricePerDay.ToString("N0") <span class="fs-6 text-muted fw-normal">/วัน</span></h4>
+                                </div>
+                                @if (isAvailable)
+                                {
+                                    <a asp-controller="Account" asp-action="Lab52"
+                                       asp-route-UserId="U001" asp-route-CarModel="@car.CarName"
+                                       asp-route-PickupLocation="สนามบินดอนเมือง"
+                                       asp-route-PickupDate="@DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)"
+                                       asp-route-RentalDays="1" asp-route-PricePerDay="@car.PricePerDay"
+                                       asp-route-TotalPrice="@car.PricePerDay"
+                                       class="btn btn-warning fw-bold text-dark px-4 py-2 shadow-sm book-btn" style="border-radius: 12px;">
+                                        จองรถ <i class="fa-solid fa-chevron-right ms-1 small"></i>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-secondary fw-bold px-4 py-2" style="border-radius: 12px;" disabled>ไม่ว่าง</button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="col-12 text-center py-5 text-muted">
+                <i class="fa-solid fa-car-rear fa-3x mb-3"></i>
+                <h5>ยังไม่มีรถยนต์ให้บริการ</h5>
+            </div>
+        }
+    </div>
+</div>
+
+<script>
+    window.addEventListener('DOMContentLoaded', () => {
+        const pickup = document.getElementById('searchPickupDate');
+        const returned = document.getElementById('searchReturnDate');
+
+        function updateReturnDateRange() {
+            if (!pickup.value) return;
+
+            const pickupDate = new Date(`${pickup.value}T00:00:00Z`);
+            const minReturn = new Date(pickupDate);
+            minReturn.setUTCDate(minReturn.getUTCDate() + 1);
+            const maxReturn = new Date(pickupDate);
+            maxReturn.setUTCDate(maxReturn.getUTCDate() + 30);
+            returned.min = minReturn.toISOString().slice(0, 10);
+            returned.max = maxReturn.toISOString().slice(0, 10);
+
+            if (returned.value < returned.min) returned.value = returned.min;
+            if (returned.value > returned.max) returned.value = returned.max;
+        }
+
+        pickup.addEventListener('change', updateReturnDateRange);
+        updateReturnDateRange();
+    });
+</script>
+
+<style>
+    .car-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1) !important;
+    }
+    .car-card:hover .car-img {
+        transform: scale(1.08);
+    }
+    .car-title-link:hover {
+        color: #0d6efd !important;
+    }
+    .search-btn:hover {
+        background-color: #ffca2c !important;
+        transform: scale(1.02);
+        box-shadow: 0 5px 15px rgba(255, 193, 7, 0.4);
+    }
+    .book-btn:hover {
+        background-color: #ffca2c !important;
+        box-shadow: 0 5px 12px rgba(255, 193, 7, 0.3);
+    }
+    .view-all-link:hover {
+        text-decoration: underline !important;
+    }
+</style>

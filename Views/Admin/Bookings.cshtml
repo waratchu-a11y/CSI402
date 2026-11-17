@@ -1,0 +1,159 @@
+@model IEnumerable<warat_0583_l005.Models.BookingModel>
+@using warat_0583_l005.Models
+@{
+    ViewData["Title"] = "รายการจอง";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var users = (List<UserModel>)ViewBag.Users;
+    var selectedUserId = ViewBag.SelectedUserId as string;
+    var customerNames = (Dictionary<string, string>)ViewBag.CustomerNames;
+    var verifiedPayments = (Dictionary<int, decimal>)ViewBag.VerifiedPayments;
+    var editableBookingIds = (HashSet<int>)ViewBag.EditableBookingIds;
+    var cancellableBookingIds = (HashSet<int>)ViewBag.CancellableBookingIds;
+
+    string StatusLabel(string status) => status switch
+    {
+        "pending" => "รอดำเนินการ",
+        "pending_payment" => "รอชำระมัดจำ",
+        "payment_review" => "รอตรวจสอบสลิป",
+        "payment_rejected" => "ชำระเงินไม่ผ่าน",
+        "confirmed" => "ยืนยันแล้ว",
+        "rented" => "กำลังเช่า",
+        "completed" => "คืนรถแล้ว",
+        "cancelled" => "ยกเลิกแล้ว",
+        _ => status
+    };
+}
+
+<div class="container py-4 py-lg-5">
+    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
+        <div>
+            <h1 class="h2 fw-bold mb-1"><i class="fa-solid fa-calendar-check text-primary me-2"></i>รายการจองรถ</h1>
+            <p class="text-muted mb-0">ค้นหารายการจองของลูกค้า ตรวจสอบรถและช่วงเวลา พร้อมจัดการรายการที่ยังไม่ชำระ</p>
+        </div>
+        <a asp-controller="Admin" asp-action="Index" class="btn btn-outline-secondary rounded-pill px-3">
+            <i class="fa-solid fa-arrow-left me-1"></i>กลับหน้าภาพรวม
+        </a>
+    </div>
+
+    @if (TempData["AdminBookingMessage"] is string success)
+    {
+        <div class="alert alert-success">@success</div>
+    }
+    @if (TempData["AdminBookingError"] is string error)
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    <div class="alert alert-info">
+        <i class="fa-solid fa-circle-info me-1"></i>
+        แก้ไขรถหรือวันเช่าได้เฉพาะรายการที่ยังไม่มีการชำระเงินที่รอตรวจสอบหรือยืนยันแล้ว
+        หากยกเลิกรายการที่ชำระแล้ว ระบบจะส่งคำขอคืนเงินเต็มยอดที่ยืนยันชำระให้ฝ่ายการเงินดำเนินการ
+    </div>
+
+    <section class="card mb-4">
+        <div class="card-body p-4">
+            <form method="get" asp-action="Bookings" class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label for="userId" class="form-label fw-semibold">เลือกลูกค้า</label>
+                    <select id="userId" name="userId" class="form-select">
+                        <option value="">ลูกค้าทั้งหมด</option>
+                        @foreach (var user in users)
+                        {
+                            <option value="@user.Username" selected="@(user.Username == selectedUserId)">
+                                @user.Username @if (!string.IsNullOrWhiteSpace(user.Email)) { <text>(@user.Email)</text> }
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button class="btn btn-primary flex-grow-1"><i class="fa-solid fa-magnifying-glass me-1"></i>ค้นหารายการ</button>
+                    <a asp-action="Bookings" class="btn btn-outline-secondary">ล้าง</a>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="card-header bg-white border-0 px-4 pt-4">
+            <h2 class="h5 fw-bold mb-0">
+                @if (string.IsNullOrWhiteSpace(selectedUserId))
+                {
+                    <span>รายการจองทั้งหมด (@Model.Count())</span>
+                }
+                else
+                {
+                    <span>รายการจองของ @selectedUserId (@Model.Count())</span>
+                }
+            </h2>
+        </div>
+        <div class="card-body p-0 mt-3">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="px-4">รหัส / ลูกค้า</th>
+                            <th>รถที่จอง</th>
+                            <th>กำหนดการ</th>
+                            <th>ยอดจอง / ชำระแล้ว</th>
+                            <th>สถานะ</th>
+                            <th class="text-end pe-4">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var booking in Model)
+                        {
+                            customerNames.TryGetValue(booking.UserId, out var customerName);
+                            verifiedPayments.TryGetValue(booking.BookingId, out var paidAmount);
+                            <tr>
+                                <td class="px-4">
+                                    <strong>#BK-@booking.BookingId</strong>
+                                    <span class="d-block text-muted small">@(customerName ?? booking.UserId)</span>
+                                </td>
+                                <td>
+                                    <strong>@booking.CarModel</strong>
+                                    <span class="d-block text-muted small">รถรหัส @(booking.CarId?.ToString() ?? "เดิม")</span>
+                                </td>
+                                <td>
+                                    <span class="d-block">รับ: @booking.PickupDate @booking.PickupTime</span>
+                                    <span class="d-block text-muted small">คืน: @booking.ReturnDate?.ToString("yyyy-MM-dd") @booking.ReturnTime</span>
+                                    <span class="d-block text-muted small">@booking.PickupLocation → @booking.ReturnLocation</span>
+                                </td>
+                                <td>
+                                    <span class="d-block">รวม ฿@booking.TotalPrice.ToString("N2")</span>
+                                    <span class="d-block text-muted small">ยืนยันชำระแล้ว ฿@paidAmount.ToString("N2")</span>
+                                </td>
+                                <td><span class="badge rounded-pill bg-light text-dark border">@StatusLabel(booking.BookingStatus)</span></td>
+                                <td class="text-end pe-4 text-nowrap">
+                                    @if (editableBookingIds.Contains(booking.BookingId))
+                                    {
+                                        <a asp-action="EditBooking" asp-route-id="@booking.BookingId" class="btn btn-sm btn-outline-primary">
+                                            <i class="fa-solid fa-pen-to-square me-1"></i>แก้ไข
+                                        </a>
+                                    }
+                                    @if (cancellableBookingIds.Contains(booking.BookingId))
+                                    {
+                                        <form asp-action="CancelBooking" method="post" class="d-inline"
+                                              onsubmit="return confirm('ยืนยันยกเลิกรายการจอง #BK-@booking.BookingId หรือไม่?');">
+                                            <input type="hidden" name="id" value="@booking.BookingId" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="fa-solid fa-ban me-1"></i>ยกเลิก
+                                            </button>
+                                        </form>
+                                    }
+                                    @if (!editableBookingIds.Contains(booking.BookingId) && !cancellableBookingIds.Contains(booking.BookingId))
+                                    {
+                                        <span class="small text-muted">ไม่มีการจัดการในสถานะนี้</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.Any())
+                        {
+                            <tr><td colspan="6" class="text-center text-muted py-5">ไม่พบรายการจองของลูกค้าที่เลือก</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>

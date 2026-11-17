@@ -1,0 +1,50 @@
+@model IEnumerable<warat_0583_l005.Models.UserModel>
+
+@{
+    ViewData["Title"] = "Lab9_1 - User List";
+}
+
+<div class="container mt-4">
+    <h2>รายชื่อผู้ใช้งานจากฐานข้อมูล (Lab9_1)</h2>
+
+    <a asp-action="Lab9" class="btn btn-success mb-3">+ เพิ่มข้อมูลใหม่</a>
+
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>รหัส (ID)</th>
+                <th>Username</th>
+                <th>Password</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>จัดการ</th> <!-- เพิ่มหัวคอลัมน์ตรงนี้ -->
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model != null && Model.Any())
+            {
+                foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@item.Id</td>
+                        <td>@item.Username</td>
+                        <td>@item.Password</td>
+                        <td>@item.Email</td>
+                        <td>@item.Phone</td>
+                        <td>
+                            <!-- เพิ่มปุ่มลบตรงนี้ (พร้อมแจ้งเตือนก่อนลบ) -->
+                            <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-danger btn-sm" onclick="return confirm('คุณแน่ใจหรือไม่ว่าจะลบข้อมูลของ @item.Username?');">ลบ</a>
+                        </td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <!-- เปลี่ยน colspan เป็น 6 เพื่อให้พอดีกับคอลัมน์ใหม่ -->
+                    <td colspan="6" class="text-center">ยังไม่มีข้อมูลในระบบ</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

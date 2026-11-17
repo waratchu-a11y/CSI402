@@ -1,0 +1,13 @@
+@model warat_0583_l005.Models.BookingModel
+@{
+    ViewData["Title"] = "ส่งหลักฐานแล้ว";
+    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+}
+
+<div class="container my-5">
+    <div class="alert alert-success shadow-sm">
+        <h3 class="fw-bold">ส่งหลักฐานการโอนแล้ว</h3>
+        <p>รายการจอง #@Model.BookingId กำลังรอฝ่ายการเงินตรวจสอบ ยอดมัดจำ ฿@Model.DepositAmount.ToString("N2")</p>
+        <a asp-controller="Home" asp-action="MyBookings" class="btn btn-primary">ดูสถานะการจอง</a>
+    </div>
+</div>

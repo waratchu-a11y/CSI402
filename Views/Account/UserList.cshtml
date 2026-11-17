@@ -1,0 +1,73 @@
+@model IEnumerable<warat_0583_l005.Models.UserModel>
+@{
+    ViewData["Title"] = "User List";
+}
+
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h3 class="card-title mb-0">รายการผู้ใช้งานในระบบ (User List)</h3>
+            <a asp-controller="Account" asp-action="AddUser" class="btn btn-sm btn-success">+ เพิ่มผู้ใช้ใหม่</a>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped table-hover align-middle">
+                    <thead class="table-dark text-center">
+                        <tr>
+                            <th>#</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>เพศ</th>
+                            <th>Role</th>
+                            <th>วันที่ลงทะเบียน</th>
+                            <!-- เพิ่มคอลัมน์สำหรับจัดการข้อมูล -->
+                            <th>จัดการ (Action)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            @foreach (var user in Model)
+                            {
+                                <tr>
+                                    <td class="text-center">@user.Id</td>
+                                    <td>@user.Username</td>
+                                    <td>@user.Email</td>
+                                    <td>@user.Phone</td>
+                                    <td class="text-center">@user.Gender</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-primary">@user.Role</span>
+                                    </td>
+                                    <td class="text-center">@user.RegisterDate.ToString("dd/MM/yyyy HH:mm")</td>
+                                    
+                                    <!-- เพิ่มปุ่ม แก้ไข และ ลบ พร้อมแนบ Id ไปให้ Controller -->
+                                    <td class="text-center">
+                                        <a asp-controller="Account" asp-action="EditUser" asp-route-id="@user.Id" class="btn btn-sm btn-warning">แก้ไข</a>
+                                        @if (user.IsActive)
+                                        {
+                                            <form asp-controller="Account" asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('ยืนยันปิดใช้งานบัญชีนี้หรือไม่?');">
+                                                <input type="hidden" name="id" value="@user.Id" />
+                                                <button type="submit" class="btn btn-sm btn-danger">ปิดใช้งาน</button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">ปิดใช้งาน</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center text-muted">ไม่พบข้อมูลผู้ใช้งาน</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,25 @@
+@model IEnumerable<warat_0583_l005.Models.PaymentModel>
+@{
+    ViewData["Title"] = "ประวัติการเงิน";
+    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+}
+
+<div class="container my-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="fw-bold">ประวัติรายการชำระเงิน</h2>
+        <a asp-action="ReviewQueue" class="btn btn-outline-primary">กลับคิวตรวจสอบ</a>
+    </div>
+    <div class="table-responsive"><table class="table table-hover align-middle">
+        <thead><tr><th>วันเวลา</th><th>Booking</th><th>ประเภท</th><th>ยอด</th><th>สถานะ</th><th>Reference</th><th>ผู้ตรวจ</th></tr></thead>
+        <tbody>
+        @foreach (var payment in Model)
+        {
+            <tr>
+                <td>@payment.CreatedAt.ToString("g")</td><td>#@payment.BookingId</td><td>@payment.PaymentType</td>
+                <td>฿@payment.Amount.ToString("N2")</td><td>@payment.PaymentStatus</td><td>@payment.ReferenceNumber</td><td>@payment.ReviewedBy</td>
+            </tr>
+        }
+        @if (!Model.Any()) { <tr><td colspan="7" class="text-center text-muted py-4">ไม่มีประวัติรายการ</td></tr> }
+        </tbody>
+    </table></div>
+</div>

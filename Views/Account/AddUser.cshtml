@@ -1,0 +1,61 @@
+@model warat_0583_l005.Models.UserModel
+@{
+    ViewData["Title"] = "Add User";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7">
+            <div class="card shadow">
+                <h3 class="card-header bg-info text-white text-center">เพิ่มผู้ใช้งาน (Add User)</h3>
+                <div class="card-body">
+                    <form asp-controller="Account" asp-action="AddUser" method="post">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Username</label>
+                                <input type="text" asp-for="Username" class="form-control" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email</label>
+                                <input type="email" asp-for="Email" class="form-control" required />
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Password</label>
+                                <input type="password" asp-for="Password" class="form-control" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">เบอร์โทรศัพท์</label>
+                                <input type="tel" asp-for="Phone" class="form-control" />
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">บทบาท (Role)</label>
+                                <select asp-for="Role" class="form-select">
+                                    <option value="Customer">Customer</option>
+                                    <option value="Employee">Employee</option>
+                                    <option value="Manager">Manager</option>
+                                    <option value="Finance">Finance</option>
+                                    <option value="Service">Service</option>
+                                    <option value="Admin">Admin</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">เพศ</label>
+                                <select asp-for="Gender" class="form-select">
+                                    <option value="ชาย">ชาย</option>
+                                    <option value="หญิง">หญิง</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-info text-white">บันทึกข้อมูลผู้ใช้</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

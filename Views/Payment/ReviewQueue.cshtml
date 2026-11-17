@@ -1,0 +1,122 @@
+@model IEnumerable<warat_0583_l005.Models.PaymentModel>
+@using warat_0583_l005.Models
+@{
+    ViewData["Title"] = "ตรวจสอบการชำระเงิน";
+    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+    var bookings = (Dictionary<int, BookingModel>)ViewBag.Bookings;
+    var refundableBookings = (List<BookingModel>)ViewBag.RefundableBookings;
+    var pendingPayments = Model.Where(payment => payment.PaymentType != "refund").ToList();
+    var cancellationRefunds = Model.Where(payment => payment.PaymentType == "refund").ToList();
+}
+
+<div class="container my-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">ฝ่ายการเงิน — ตรวจสอบการชำระเงิน</h2>
+        <a asp-action="History" class="btn btn-outline-primary">ประวัติการเงิน</a>
+    </div>
+    @if (TempData["PaymentMessage"] is string message)
+    {
+        <div class="alert alert-info">@message</div>
+    }
+
+    <div class="card shadow-sm mb-5">
+        <div class="card-header fw-bold">หลักฐานโอนที่รอตรวจ</div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>รายการ</th><th>ลูกค้า / รถ</th><th>ยอด</th><th>หลักฐาน</th><th>การตรวจสอบ</th></tr></thead>
+                <tbody>
+                @foreach (var payment in pendingPayments)
+                {
+                    if (!bookings.TryGetValue(payment.BookingId, out var booking)) { continue; }
+                    <tr>
+                        <td>#@payment.PaymentId / Booking #@booking.BookingId<br /><small>@payment.CreatedAt.ToString("g")</small><br /><small>@(payment.PaymentType == "deposit" ? "มัดจำ" : "ค่าเช่า")</small></td>
+                        <td>@booking.UserId<br />@booking.CarModel<br /><a asp-action="License" asp-route-bookingId="@booking.BookingId">ดูใบขับขี่</a></td>
+                        <td>฿@payment.Amount.ToString("N2")<br /><small>@payment.ReferenceNumber</small></td>
+                        <td>
+                            @if (payment.ProofFileName is not null)
+                            {
+                                <a asp-action="Proof" asp-route-paymentId="@payment.PaymentId" target="_blank" rel="noopener">เปิดสลิป</a>
+                            }
+                        </td>
+                        <td>
+                            <form asp-action="Review" method="post" class="d-flex flex-column gap-2">
+                                <input type="hidden" name="paymentId" value="@payment.PaymentId" />
+                                <input name="note" class="form-control form-control-sm" maxlength="500" placeholder="หมายเหตุ / เหตุผลปฏิเสธ" />
+                                <div class="d-flex gap-2">
+                                    <button name="approve" value="true" class="btn btn-sm btn-success">ยืนยันรับเงิน</button>
+                                    <button name="approve" value="false" class="btn btn-sm btn-outline-danger">ปฏิเสธ</button>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                @if (!pendingPayments.Any())
+                {
+                    <tr><td colspan="5" class="text-center text-muted py-4">ไม่มีหลักฐานรอตรวจสอบ</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-5">
+        <div class="card-header fw-bold">คำขอคืนเงินจากการยกเลิก</div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>รายการ</th><th>ลูกค้า / รถ</th><th>ยอดคืนเต็มจำนวน</th><th>เลขอ้างอิงโอนคืน</th></tr></thead>
+                <tbody>
+                @foreach (var refund in cancellationRefunds)
+                {
+                    if (!bookings.TryGetValue(refund.BookingId, out var booking)) { continue; }
+                    <tr>
+                        <td>#@refund.PaymentId / Booking #@booking.BookingId<br /><small>@refund.CreatedAt.ToString("g")</small></td>
+                        <td>@booking.UserId<br />@booking.CarModel</td>
+                        <td>฿@refund.Amount.ToString("N2")</td>
+                        <td>
+                            <form asp-action="CompleteCancellationRefund" method="post" class="d-flex gap-2">
+                                <input type="hidden" name="paymentId" value="@refund.PaymentId" />
+                                <input name="transferReference" class="form-control form-control-sm" maxlength="100" placeholder="เลขอ้างอิงโอนคืน" required />
+                                <button class="btn btn-sm btn-warning text-nowrap">บันทึกโอนคืน</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                @if (cancellationRefunds.Count == 0)
+                {
+                    <tr><td colspan="4" class="text-center text-muted py-4">ไม่มีคำขอคืนเงินจากการยกเลิก</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header fw-bold">รายการคืนรถที่พร้อมคืนมัดจำ</div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>Booking</th><th>ลูกค้า / รถ</th><th>มัดจำ</th><th>คืนเงินผ่านโอน</th></tr></thead>
+                <tbody>
+                @foreach (var booking in refundableBookings)
+                {
+                    <tr>
+                        <td>#@booking.BookingId</td>
+                        <td>@booking.UserId / @booking.CarModel</td>
+                        <td>฿@booking.DepositAmount.ToString("N2")</td>
+                        <td>
+                            <form asp-action="CompleteRefund" method="post" class="d-flex gap-2">
+                                <input type="hidden" name="bookingId" value="@booking.BookingId" />
+                                <input name="transferReference" class="form-control form-control-sm" maxlength="100" placeholder="เลขอ้างอิงโอนคืน" required />
+                                <button class="btn btn-sm btn-warning text-nowrap">บันทึกการคืนมัดจำ</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                @if (refundableBookings.Count == 0)
+                {
+                    <tr><td colspan="4" class="text-center text-muted py-4">ไม่มีรายการคืนมัดจำที่รอดำเนินการ</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,128 @@
+@model warat_0583_l005.ViewModels.RegisterViewModel
+@{
+    ViewData["Title"] = "ลงทะเบียน (Register)";
+    // 📌 บังคับใช้ Layout ฝั่งลูกค้า เพื่อซ่อนแถบเมนูดำของแอดมิน
+    Layout = "~/Views/Shared/_CustomerLayout.cshtml"; 
+}
+
+<div class="container mt-5 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+            <!-- การ์ดสมัครสมาชิกดีไซน์พรีเมียม -->
+            <div class="card shadow-lg border-0" style="border-radius: 20px; overflow: hidden;">
+                <!-- หัวการ์ดสีเขียวไล่ระดับ (Gradient) พร้อมไอคอน -->
+                <div class="text-white text-center py-4 px-3" style="background: linear-gradient(135deg, #198754, #20c997);">
+                    <h3 class="mb-0 fw-bold"><i class="fa-solid fa-user-plus me-2"></i>สร้างบัญชีผู้ใช้ใหม่</h3>
+                    <p class="mb-0 mt-1 text-white-50 small">สมัครสมาชิกเพื่อจองรถเช่าและรับสิทธิประโยชน์มากมาย</p>
+                </div>
+                
+                <div class="card-body p-4 p-md-5 bg-white">
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="alert alert-danger rounded-3 small py-2">
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i> กรุณาตรวจสอบข้อมูลให้ถูกต้องอีกครั้ง
+                        </div>
+                    }
+
+                    <form asp-controller="Account" asp-action="Register" method="post">
+                        <div class="row g-3">
+                            <!-- Username -->
+                            <div class="col-12">
+                                <label class="form-label fw-bold text-secondary small">ชื่อผู้ใช้งาน (Username)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0" style="border-radius: 12px 0 0 12px;"><i class="fa-solid fa-user text-success"></i></span>
+                                    <input type="text" asp-for="Username" class="form-control border-start-0 ps-0 shadow-none" placeholder="กรอกชื่อผู้ใช้ของคุณ" style="border-radius: 0 12px 12px 0;" required />
+                                </div>
+                            </div>
+
+                            <!-- Email -->
+                            <div class="col-12">
+                                <label class="form-label fw-bold text-secondary small">อีเมล (Email สำหรับรับ OTP)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0" style="border-radius: 12px 0 0 12px;"><i class="fa-solid fa-envelope text-success"></i></span>
+                                    <input type="email" asp-for="Email" class="form-control border-start-0 ps-0 shadow-none" placeholder="example@email.com" style="border-radius: 0 12px 12px 0;" required />
+                                </div>
+                            </div>
+
+                            <!-- Password -->
+                            <div class="col-12">
+                                <label class="form-label fw-bold text-secondary small">รหัสผ่าน (Password)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0" style="border-radius: 12px 0 0 12px;"><i class="fa-solid fa-lock text-success"></i></span>
+                                    <input type="password" asp-for="Password" class="form-control border-start-0 ps-0 shadow-none" placeholder="กำหนดรหัสผ่านของคุณ" style="border-radius: 0 12px 12px 0;" required />
+                                </div>
+                            </div>
+                            
+                            <!-- 📌 ช่องกรอกเลขบัตรประชาชน -->
+                            <div class="col-12">
+                                <label class="form-label fw-bold text-secondary small">เลขประจำตัวประชาชน (13 หลัก)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0" style="border-radius: 12px 0 0 12px;"><i class="fa-solid fa-id-card text-success"></i></span>
+                                    <input type="text" asp-for="IdCard" class="form-control border-start-0 ps-0 shadow-none" placeholder="กรอกเลขบัตรประชาชน 13 หลัก" maxlength="13" pattern="\d{13}" title="กรุณากรอกตัวเลข 13 หลักให้ถูกต้อง" style="border-radius: 0 12px 12px 0;" required />
+                                </div>
+                            </div>
+
+                            <!-- 📌 ช่องกรอกเลขใบขับขี่ -->
+                            <div class="col-12">
+                                <label class="form-label fw-bold text-secondary small">เลขที่ใบอนุญาตขับรถ</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0" style="border-radius: 12px 0 0 12px;"><i class="fa-solid fa-car text-success"></i></span>
+                                    <input type="text" asp-for="DriverLicense" class="form-control border-start-0 ps-0 shadow-none" placeholder="กรอกเลขใบขับขี่ของคุณ" style="border-radius: 0 12px 12px 0;" required />
+                                </div>
+                            </div>
+
+                            <!-- Phone -->
+                            <div class="col-12">
+                                <label class="form-label fw-bold text-secondary small">เบอร์โทรศัพท์</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0" style="border-radius: 12px 0 0 12px;"><i class="fa-solid fa-phone text-success"></i></span>
+                                    <input type="tel" asp-for="Phone" class="form-control border-start-0 ps-0 shadow-none" placeholder="08XXXXXXXX" style="border-radius: 0 12px 12px 0;" />
+                                </div>
+                            </div>
+
+                            <!-- Gender -->
+                            <div class="col-12 mt-3">
+                                <label class="form-label fw-bold text-secondary small d-block">เพศ</label>
+                                <div class="d-flex gap-4">
+                                    <div class="form-check custom-radio">
+                                        <input class="form-check-input" type="radio" asp-for="Gender" value="ชาย" id="male" checked>
+                                        <label class="form-check-label text-dark fw-semibold" for="male">ชาย</label>
+                                    </div>
+                                    <div class="form-check custom-radio">
+                                        <input class="form-check-input" type="radio" asp-for="Gender" value="หญิง" id="female">
+                                        <label class="form-check-label text-dark fw-semibold" for="female">หญิง</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- ปุ่มควบคุม -->
+                            <div class="col-12 mt-4">
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-success btn-lg fw-bold shadow-sm py-2" style="border-radius: 12px; transition: all 0.3s;">
+                                        <i class="fa-solid fa-paper-plane me-1"></i> สมัครสมาชิก & ส่งรหัส OTP
+                                    </button>
+                                    <a asp-controller="Account" asp-action="Login" class="btn btn-light border text-muted fw-bold py-2" style="border-radius: 12px;">
+                                        <i class="fa-solid fa-arrow-left me-1"></i> มีบัญชีอยู่แล้ว? เข้าสู่ระบบ
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* เพิ่มลูกเล่น Effect เมื่อเอาเมาส์ชี้ปุ่มสมัครสมาชิก */
+    .btn-success:hover {
+        background-color: #157347 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(25, 135, 84, 0.3);
+    }
+    .form-control:focus {
+        border-color: #198754;
+        box-shadow: none;
+    }
+</style>

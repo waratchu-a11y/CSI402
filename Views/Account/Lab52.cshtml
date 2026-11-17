@@ -1,0 +1,368 @@
+@{
+    ViewData["Title"] = "จองรถเช่า - DriverRent";
+    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+    
+    // ดึง Username จาก Cookie มาแสดง
+    string currentUsername = Context.Request.Cookies["Username"] ?? "Guest";
+    string pickupDateValue = ViewBag.PickupDate as string
+        ?? DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    string returnDateValue = ViewBag.ReturnDate as string
+        ?? DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    string pickupLocationValue = ViewBag.PickupLocation as string ?? "สนามบินสุวรรณภูมิ";
+}
+
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-lg border-0" style="border-radius: 20px; overflow: hidden;">
+                <div class="bg-primary text-white p-4 text-center" style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
+                    <h3 class="fw-bold m-1"><i class="fa-solid fa-calendar-check me-2"></i> จองรถเช่า</h3>
+                    <p class="text-white-50 small m-0">กรอกข้อมูลการเช่ารถของคุณเพื่อดำเนินการต่อ</p>
+                </div>
+
+                <div class="card-body p-5">
+                    <!-- ฟอร์มส่งข้อมูลไปยัง ConfirmBooking (GET) -->
+                    <form asp-action="ConfirmBooking" method="get">
+                        <div class="row g-3">
+                            <!-- ช่องรหัสลูกค้า -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary small">รหัสลูกค้า / ชื่อผู้ใช้ (User ID)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-2" style="border-radius: 12px 0 0 12px;"><i class="fa-solid fa-user text-primary"></i></span>
+                                    <input type="text" name="UserId" class="form-control form-control-lg border-2 shadow-none bg-light fw-bold text-dark" value="@currentUsername" readonly style="border-radius: 0 12px 12px 0;" />
+                                </div>
+                                <small class="text-muted">ล็อกอินในนาม: @currentUsername</small>
+                            </div>
+
+                            <!-- ช่องเลือกรุ่นรถ (ดึงแบบ Dynamic จากฐานข้อมูล MySQL) -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary small">เลือกรุ่นรถ</label>
+                                <select id="carSelect" name="CarModel" class="form-select form-select-lg border-2 shadow-none" style="border-radius: 12px;" onchange="updatePrice()">
+                                    @if (ViewBag.Cars != null)
+                                    {
+                                        var cars = (List<warat_0583_l005.Models.CarModel>)ViewBag.Cars;
+                                        foreach (var car in cars)
+                                        {
+                                            bool isNotAvailable = car.Status != "ว่าง";
+
+                                            if (isNotAvailable)
+                                            {
+                                                <option value="@car.CarName" data-price="@car.PricePerDay" disabled class="text-danger bg-light">
+                                                    @car.CarName (฿@car.PricePerDay.ToString("N0")/วัน) - ❌ ไม่ว่าง (@car.Status)
+                                                </option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@car.CarName" data-price="@car.PricePerDay" selected="@(car.CarName == (ViewBag.CarModel as string))">
+                                                    @car.CarName - @(car.TransmissionType == "automatic" ? "เกียร์อัตโนมัติ" : car.TransmissionType == "manual" ? "เกียร์ธรรมดา" : "ไม่ระบุเกียร์"), @(car.Seats?.ToString() ?? "ไม่ระบุ") ที่นั่ง (฿@car.PricePerDay.ToString("N0")/วัน)
+                                                </option>
+                                            }
+                                        }
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- สถานที่รับและคืนรถ -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary small">สถานที่รับรถ</label>
+                                <select name="PickupLocation" class="form-select form-select-lg border-2 shadow-none" style="border-radius: 12px;" required>
+                                    <option value="สนามบินสุวรรณภูมิ" selected="@(pickupLocationValue == "สนามบินสุวรรณภูมิ")">สนามบินสุวรรณภูมิ</option>
+                                    <option value="สนามบินดอนเมือง" selected="@(pickupLocationValue == "สนามบินดอนเมือง")">สนามบินดอนเมือง</option>
+                                    <option value="เชียงใหม่" selected="@(pickupLocationValue == "เชียงใหม่")">เชียงใหม่</option>
+                                    <option value="ภูเก็ต" selected="@(pickupLocationValue == "ภูเก็ต")">ภูเก็ต</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary small">สถานที่คืนรถ</label>
+                                <select name="ReturnLocation" class="form-select form-select-lg border-2 shadow-none" style="border-radius: 12px;" required>
+                                    <option value="สนามบินสุวรรณภูมิ">สนามบินสุวรรณภูมิ</option>
+                                    <option value="สนามบินดอนเมือง">สนามบินดอนเมือง</option>
+                                    <option value="เชียงใหม่">เชียงใหม่</option>
+                                    <option value="ภูเก็ต">ภูเก็ต</option>
+                                </select>
+                            </div>
+
+                            <!-- วันที่รับรถ -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary small">วันที่รับรถ</label>
+                                <input id="pickupDate" type="date" name="PickupDate" class="form-control form-control-lg border-2 shadow-none" style="border-radius: 12px;" value="@pickupDateValue" min="@DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary small">วันที่คืนรถ</label>
+                                <input id="returnDate" type="date" name="returnDate" class="form-control form-control-lg border-2 shadow-none" style="border-radius: 12px;" value="@returnDateValue" required />
+                                <small id="rentalDuration" class="text-muted">ระยะเวลาเช่า 1 วัน</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary small">เวลารับรถ</label>
+                                <input type="time" name="PickupTime" class="form-control form-control-lg border-2 shadow-none" style="border-radius: 12px;" value="09:00" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary small">เวลาคืนรถ</label>
+                                <input type="time" name="ReturnTime" class="form-control form-control-lg border-2 shadow-none" style="border-radius: 12px;" value="09:00" required />
+                            </div>
+                            <input type="hidden" id="rentalDays" name="rentalDays" value="1" />
+
+                            <div class="col-12">
+                                <label class="form-label fw-bold text-secondary small">โปรโมชั่นและส่วนลด</label>
+                                @if (User.Identity?.IsAuthenticated == true)
+                                {
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <button id="showPromotionsButton" type="button" class="btn btn-outline-primary btn-lg">
+                                            <i class="fa-solid fa-tags me-2"></i>เลือกโปรโมชั่น
+                                        </button>
+                                        <button id="clearPromotionButton" type="button" class="btn btn-link text-danger d-none">
+                                            ลบโปรโมชั่นที่เลือก
+                                        </button>
+                                    </div>
+                                    <input id="promotionId" type="hidden" name="promotionId" />
+                                    <input id="promotionCode" type="hidden" name="promotionCode" />
+                                    <input id="promotionPercent" type="hidden" value="0" />
+                                    <div id="selectedPromotion" class="small text-success mt-2" aria-live="polite">
+                                        ยังไม่ได้เลือกโปรโมชั่น
+                                    </div>
+                                    <small class="text-muted">กดเลือกโปรโมชั่นเพื่อดูส่วนลดที่ใช้ได้กับวันและจำนวนวันที่เลือก</small>
+                                }
+                                else
+                                {
+                                    <a class="btn btn-outline-primary" asp-controller="Account" asp-action="Login">
+                                        เข้าสู่ระบบเพื่อดูโปรโมชั่น
+                                    </a>
+                                }
+                            </div>
+
+                            <!-- ราคาเช่าต่อวัน -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary small">ราคาต่อวัน (บาท)</label>
+                                <input type="number" id="pricePerDay" name="PricePerDay" class="form-control form-control-lg border-2 shadow-none bg-light fw-bold text-primary" readonly style="border-radius: 12px;" />
+                            </div>
+
+                            <!-- กล่องแสดงราคารวมสุทธิแบบเรียลไทม์ -->
+                            <div class="col-12 mt-3">
+                                <div class="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center border">
+                                    <span class="fw-bold text-secondary">ราคารวมสุทธิทั้งหมด:</span>
+                                    <h3 id="totalDisplay" class="fw-bold text-success m-0">฿0</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 📌 ส่วนบริการเสริม (Add-on Services) -->
+                        <div class="card p-3 my-3 shadow-sm" style="border-radius: 15px; border: 1px solid #e3e6f0;">
+                            <h5 class="fw-bold text-success mb-3"><i class="fa-solid fa-shield-halved me-2"></i>บริการเสริม (Add-on Services)</h5>
+                            
+                            @if (ViewBag.AddonServices is List<warat_0583_l005.Models.AddOnServiceModel> addonServices)
+                            {
+                                foreach (var service in addonServices)
+                                {
+                                    string inputName = service.ServiceCode == "INSURANCE" ? "hasInsurance" : "hasBabySeat";
+                                    string inputId = $"addon-{service.ServiceId}";
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input addon-checkbox" type="checkbox" name="@inputName" value="true" id="@inputId" data-price="@service.PricePerDay" onchange="updatePrice()">
+                                        <label class="form-check-label fw-semibold text-dark" for="@inputId">
+                                            @service.ServiceName <span class="text-muted">(+฿@service.PricePerDay.ToString("N2") / วัน)</span>
+                                        </label>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="~/Home/Indexcustomer" class="btn btn-outline-secondary px-4 fw-bold" style="border-radius: 12px;">
+                                <i class="fa-solid fa-arrow-left me-1"></i> กลับหน้าแรก
+                            </a>
+                            <button type="submit" class="btn btn-warning px-5 py-2 fw-bold text-dark shadow-sm" style="border-radius: 12px;">
+                                ดำเนินการจองต่อ <i class="fa-solid fa-arrow-right ms-1"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="promotionsModal" tabindex="-1" aria-labelledby="promotionsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow" style="border-radius: 18px;">
+            <div class="modal-header text-white border-0" style="background: linear-gradient(135deg, #0d6efd, #0dcaf0);">
+                <h5 class="modal-title fw-bold" id="promotionsModalLabel">
+                    <i class="fa-solid fa-tags me-2"></i>โปรโมชั่นที่ใช้ได้
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="ปิด"></button>
+            </div>
+            <div id="promotionsList" class="modal-body p-4" aria-live="polite">
+                <div class="text-center text-muted py-3">กำลังตรวจสอบโปรโมชั่น...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- สคริปต์คำนวณราคาอัตโนมัติ (รวมบริการเสริม) -->
+<script>
+    const promotionsUrl = '@Url.Action("EligiblePromotions", "Account")';
+
+    function clearPromotion() {
+        document.getElementById('promotionId').value = '';
+        document.getElementById('promotionCode').value = '';
+        document.getElementById('promotionPercent').value = '0';
+        document.getElementById('selectedPromotion').innerText = 'ยังไม่ได้เลือกโปรโมชั่น';
+        document.getElementById('clearPromotionButton').classList.add('d-none');
+        updatePrice();
+    }
+
+    function showPromotionOptions(promotions) {
+        const list = document.getElementById('promotionsList');
+        list.replaceChildren();
+
+        if (promotions.length === 0) {
+            const emptyMessage = document.createElement('div');
+            emptyMessage.className = 'text-center text-muted py-3';
+            emptyMessage.innerText = 'ไม่มีโปรโมชั่นที่ตรงกับวันและจำนวนวันที่เลือก';
+            list.appendChild(emptyMessage);
+            return;
+        }
+
+        promotions.forEach(promotion => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn-outline-success w-100 text-start p-3 mb-2';
+
+            const title = document.createElement('div');
+            title.className = 'fw-bold';
+            title.innerText = promotion.name;
+
+            const detail = document.createElement('div');
+            detail.className = 'small text-muted mt-1';
+            detail.innerText = `ส่วนลด ${promotion.discountPercent}% สำหรับค่าเช่ารถ`;
+
+            button.append(title, detail);
+            button.addEventListener('click', () => {
+                document.getElementById('promotionId').value = promotion.id;
+                document.getElementById('promotionCode').value = promotion.code || '';
+                document.getElementById('promotionPercent').value = promotion.discountPercent;
+                document.getElementById('selectedPromotion').innerText =
+                    `เลือกแล้ว: ${promotion.name} (ลด ${promotion.discountPercent}%)`;
+                document.getElementById('clearPromotionButton').classList.remove('d-none');
+                updatePrice();
+                bootstrap.Modal.getInstance(document.getElementById('promotionsModal')).hide();
+            });
+
+            list.appendChild(button);
+        });
+    }
+
+    async function loadEligiblePromotions() {
+        const list = document.getElementById('promotionsList');
+        list.innerHTML = '<div class="text-center text-muted py-3">กำลังตรวจสอบโปรโมชั่น...</div>';
+
+        const pickupDate = document.getElementById('pickupDate').value;
+        const rentalDays = document.getElementById('rentalDays').value;
+        const query = new URLSearchParams({ pickupDate, rentalDays });
+
+        try {
+            const response = await fetch(`${promotionsUrl}?${query.toString()}`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            const contentType = response.headers.get('content-type') || '';
+            if (response.redirected || !contentType.includes('application/json')) {
+                throw new Error('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง');
+            }
+            if (!response.ok) {
+                throw new Error('ไม่สามารถตรวจสอบโปรโมชั่นได้ กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง');
+            }
+
+            showPromotionOptions(await response.json());
+        } catch (error) {
+            list.replaceChildren();
+            const errorMessage = document.createElement('div');
+            errorMessage.className = 'alert alert-danger mb-0';
+            errorMessage.innerText = error.message || 'เกิดข้อผิดพลาดในการตรวจสอบโปรโมชั่น';
+            list.appendChild(errorMessage);
+        }
+    }
+
+    function syncRentalDates() {
+        const pickupDateInput = document.getElementById('pickupDate');
+        const returnDateInput = document.getElementById('returnDate');
+        const rentalDaysInput = document.getElementById('rentalDays');
+        if (!pickupDateInput.value) return;
+
+        const pickup = new Date(`${pickupDateInput.value}T00:00:00Z`);
+        const minReturn = new Date(pickup);
+        minReturn.setUTCDate(minReturn.getUTCDate() + 1);
+        const maxReturn = new Date(pickup);
+        maxReturn.setUTCDate(maxReturn.getUTCDate() + 30);
+        const formatDate = date => date.toISOString().slice(0, 10);
+
+        returnDateInput.min = formatDate(minReturn);
+        returnDateInput.max = formatDate(maxReturn);
+        if (!returnDateInput.value || returnDateInput.value < returnDateInput.min) {
+            returnDateInput.value = returnDateInput.min;
+        } else if (returnDateInput.value > returnDateInput.max) {
+            returnDateInput.value = returnDateInput.max;
+        }
+
+        const returnDate = new Date(`${returnDateInput.value}T00:00:00Z`);
+        const rentalDays = Math.round((returnDate - pickup) / 86400000);
+        rentalDaysInput.value = rentalDays;
+        document.getElementById('rentalDuration').innerText =
+            `ระยะเวลาเช่า ${rentalDays} วัน`;
+    }
+
+    function updatePrice() {
+        const carSelect = document.getElementById('carSelect');
+        if (!carSelect || carSelect.selectedIndex === -1) return;
+        
+        const selectedOption = carSelect.options[carSelect.selectedIndex];
+        const pricePerDay = parseFloat(selectedOption.getAttribute('data-price')) || 0;
+        
+        const rentalDays = parseInt(document.getElementById('rentalDays').value) || 0;
+        
+        const priceInput = document.getElementById('pricePerDay');
+        if (priceInput) {
+            priceInput.value = pricePerDay;
+        }
+        
+        // คำนวณราคาบริการเสริมต่อวัน
+        let addonPerDay = 0;
+        const checkboxes = document.querySelectorAll('.addon-checkbox');
+        checkboxes.forEach(cb => {
+            if (cb.checked) {
+                addonPerDay += parseFloat(cb.getAttribute('data-price')) || 0;
+            }
+        });
+
+        const discountPercent = parseFloat(document.getElementById('promotionPercent')?.value) || 0;
+        const rentalTotal = pricePerDay * rentalDays;
+        const discount = rentalTotal * discountPercent / 100;
+        const totalPrice = rentalTotal - discount + addonPerDay * rentalDays;
+        
+        const totalDisplay = document.getElementById('totalDisplay');
+        if (totalDisplay) {
+            totalDisplay.innerText = '฿' + totalPrice.toLocaleString();
+        }
+    }
+
+    window.addEventListener('DOMContentLoaded', (event) => {
+        const carSelect = document.getElementById('carSelect');
+        
+        if (carSelect) carSelect.addEventListener('change', updatePrice);
+        syncRentalDates();
+        document.getElementById('pickupDate')?.addEventListener('change', () => {
+            syncRentalDates();
+            clearPromotion();
+        });
+        document.getElementById('returnDate')?.addEventListener('change', () => {
+            syncRentalDates();
+            clearPromotion();
+        });
+        document.getElementById('showPromotionsButton')?.addEventListener('click', () => {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('promotionsModal')).show();
+            loadEligiblePromotions();
+        });
+        document.getElementById('clearPromotionButton')?.addEventListener('click', clearPromotion);
+        
+        updatePrice();
+    });
+</script>

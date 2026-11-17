@@ -1,0 +1,43 @@
+@model IEnumerable<warat_0583_l005.Models.LoginHistoryModel>
+
+@{
+    ViewData["Title"] = "Login History";
+}
+
+<div class="container mt-4">
+    <h2 class="fw-bold">ประวัติผู้ที่เข้าสู่ระบบ</h2>
+    <p class="text-secondary">แสดงเฉพาะรายการเข้าสู่ระบบสำเร็จ โดยเรียงจากรายการล่าสุด</p>
+
+    <table class="table table-bordered table-striped align-middle mt-3">
+        <thead>
+            <tr>
+                <th style="width: 15%;">รหัสรายการ</th>
+                <th style="width: 15%;">รหัสผู้ใช้</th>
+                <th style="width: 20%;">ชื่อผู้ใช้</th>
+                <th style="width: 25%;">อีเมล</th>
+                <th style="width: 25%;">เวลาเข้าสู่ระบบ (UTC)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model != null && Model.Any())
+            {
+                foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@item.LoginHistoryId</td>
+                        <td>@item.UserId</td>
+                        <td>@item.Username</td>
+                        <td>@item.Email</td>
+                        <td>@item.LoggedInAtUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="5" class="text-center text-muted">ยังไม่มีประวัติการเข้าสู่ระบบ</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
