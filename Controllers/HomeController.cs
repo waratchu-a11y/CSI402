@@ -24,6 +24,7 @@ public class HomeController : Controller
             .OrderByDescending(car => car.CarId)
             .Take(3)
             .ToList();
+        ViewBag.ActivePromotions = GetAdvertisedPromotions();
         return View("Indexcustomer", cars);
     }
 
@@ -33,6 +34,7 @@ public class HomeController : Controller
             .OrderByDescending(car => car.CarId)
             .Take(3)
             .ToList();
+        ViewBag.ActivePromotions = GetAdvertisedPromotions();
         return View(cars);
     }
 
@@ -255,5 +257,17 @@ public class HomeController : Controller
             .ToList();
 
         return View("AllCars", searchResults);
+    }
+
+    private List<PromotionModel> GetAdvertisedPromotions()
+    {
+        DateTime today = DateTime.Today;
+        return _db.Promotions
+            .Where(promotion => promotion.IsActive &&
+                (!promotion.EndDate.HasValue || promotion.EndDate.Value >= today))
+            .OrderByDescending(promotion => promotion.DiscountPercent)
+            .ThenBy(promotion => promotion.StartDate)
+            .Take(6)
+            .ToList();
     }
 }

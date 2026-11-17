@@ -1,8 +1,12 @@
 ﻿@model IEnumerable<warat_0583_l005.Models.CarModel>
+@using warat_0583_l005.Models
+@using System.Globalization
 @{
     ViewData["Title"] = "หน้าแรก - DriverRent";
     // เรียกใช้ Layout สำหรับฝั่งลูกค้า
     Layout = "~/Views/Shared/_CustomerLayout.cshtml"; 
+    var promotions = ViewBag.ActivePromotions as List<PromotionModel> ?? new List<PromotionModel>();
+    var thaiCulture = CultureInfo.GetCultureInfo("th-TH");
 }
 
 <!-- ส่วน Hero Banner และ ฟอร์มค้นหา -->
@@ -54,6 +58,114 @@
         </div>
     </div>
 </div>
+
+@if (promotions.Count > 0)
+{
+    <section class="container promo-announcements mb-5" aria-labelledby="promo-heading">
+        <div class="promo-section-heading d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+            <div>
+                <span class="promo-kicker"><i class="fa-solid fa-sparkles me-1"></i>ข้อเสนอพิเศษสำหรับคุณ</span>
+                <h2 id="promo-heading" class="fw-bold mb-1 mt-2">โปรโมชันน่าใช้ <span class="promo-heading-accent">ออกเดินทางคุ้มกว่า</span></h2>
+                <p class="text-muted mb-0">เลือกข้อเสนอที่ใช่ แล้วนำไปใช้ได้ในขั้นตอนจองรถ</p>
+            </div>
+            <a asp-controller="Home" asp-action="AllCars" class="btn btn-outline-primary rounded-pill px-4">
+                เลือกรถเพื่อใช้โปรโมชัน <i class="fa-solid fa-arrow-right ms-1"></i>
+            </a>
+        </div>
+
+        <div class="row g-3 g-lg-4">
+            @for (var index = 0; index < promotions.Count; index++)
+            {
+                var promotion = promotions[index];
+                var themeClass = $"promo-theme-{index % 4}";
+                var conditionLabel = promotion.ConditionType switch
+                {
+                    "new_user" => "สำหรับสมาชิกใหม่",
+                    "3_days" => "เมื่อเช่าครบ 3 วัน",
+                    "7_days" => "เมื่อเช่าครบ 7 วัน",
+                    "weekday" => "จองและเช่าวันจันทร์–พฤหัสบดี",
+                    "festival" => "โปรโมชันช่วงเทศกาล",
+                    _ => "ส่วนลดพิเศษตามเงื่อนไข"
+                };
+                var startsLater = promotion.StartDate.HasValue && promotion.StartDate.Value.Date > DateTime.Today;
+
+                <div class="col-md-6 col-xl-4">
+                    <article class="promo-card @themeClass h-100">
+                        <div class="promo-card-glow"></div>
+                        <div class="promo-card-content">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <span class="promo-status @(startsLater ? "promo-status-upcoming" : "")">
+                                    <i class="fa-solid @(startsLater ? "fa-clock" : "fa-bolt") me-1"></i>
+                                    @(startsLater ? "เร็ว ๆ นี้" : "ข้อเสนอพิเศษ")
+                                </span>
+                                <i class="fa-solid fa-ticket promo-ticket-icon" aria-hidden="true"></i>
+                            </div>
+                            <div class="promo-discount mt-3">
+                                <span class="promo-discount-number">@promotion.DiscountPercent.ToString("0.#")</span>
+                                <span class="promo-discount-symbol">%</span>
+                                <span class="promo-discount-label">OFF</span>
+                            </div>
+                            <h3 class="promo-title">@promotion.PromotionName</h3>
+                            <p class="promo-condition mb-3">@conditionLabel</p>
+
+                            @if (promotion.StartDate.HasValue || promotion.EndDate.HasValue)
+                            {
+                                <div class="promo-validity">
+                                    <i class="fa-regular fa-calendar me-1"></i>
+                                    @if (promotion.StartDate.HasValue && promotion.EndDate.HasValue)
+                                    {
+                                        <span>@promotion.StartDate.Value.ToString("dd MMM yyyy", thaiCulture) – @promotion.EndDate.Value.ToString("dd MMM yyyy", thaiCulture)</span>
+                                    }
+                                    else if (promotion.StartDate.HasValue)
+                                    {
+                                        <span>เริ่ม @promotion.StartDate.Value.ToString("dd MMM yyyy", thaiCulture)</span>
+                                    }
+                                    else
+                                    {
+                                        <span>ใช้ได้ถึง @promotion.EndDate!.Value.ToString("dd MMM yyyy", thaiCulture)</span>
+                                    }
+                                </div>
+                            }
+
+                            <div class="promo-card-footer">
+                                @if (!string.IsNullOrWhiteSpace(promotion.PromotionCode))
+                                {
+                                    <span class="promo-code"><i class="fa-solid fa-tag me-1"></i>@promotion.PromotionCode</span>
+                                }
+                                else
+                                {
+                                    <span class="promo-code promo-code-auto"><i class="fa-solid fa-check me-1"></i>ใช้ตามเงื่อนไข</span>
+                                }
+                                <a asp-controller="Home" asp-action="AllCars" class="promo-cta" aria-label="เลือกใช้โปรโมชัน @promotion.PromotionName">
+                                    จองเลย <i class="fa-solid fa-arrow-up-right-from-square ms-1"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            }
+        </div>
+    </section>
+}
+else
+{
+    <section class="container promo-announcements mb-5" aria-labelledby="promo-heading">
+        <div class="promo-empty">
+            <div class="promo-empty-art" aria-hidden="true">
+                <i class="fa-solid fa-ticket"></i>
+                <span>%</span>
+            </div>
+            <div class="promo-empty-copy">
+                <span class="promo-kicker"><i class="fa-solid fa-sparkles me-1"></i>DriverRent offers</span>
+                <h2 id="promo-heading" class="fw-bold mt-2 mb-2">ขณะนี้ยังไม่มีโปรโมชันที่เปิดใช้งาน</h2>
+                <p class="mb-0">กลับมาเยี่ยมชมอีกครั้ง หรือเลือกรถที่เหมาะกับการเดินทางของคุณได้เลย</p>
+            </div>
+            <a asp-controller="Home" asp-action="AllCars" class="btn btn-warning rounded-pill px-4 fw-semibold">
+                เลือกรถเช่า <i class="fa-solid fa-arrow-right ms-1"></i>
+            </a>
+        </div>
+    </section>
+}
 
 <!-- ส่วนแสดงรถเช่ายอดนิยม -->
 <div class="container mb-5">
@@ -148,6 +260,222 @@
 </script>
 
 <style>
+    .promo-announcements {
+        --promo-ink: #172033;
+    }
+    .promo-empty {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        overflow: hidden;
+        min-height: 170px;
+        padding: 1.5rem clamp(1.25rem, 4vw, 2.5rem);
+        border: 1px solid #e6edf7;
+        border-radius: 22px;
+        background: linear-gradient(110deg, #fff 0%, #f3f8ff 55%, #eefaff 100%);
+        box-shadow: 0 10px 28px rgba(31, 45, 61, .06);
+    }
+    .promo-empty-art {
+        position: relative;
+        display: flex;
+        flex: 0 0 92px;
+        align-items: center;
+        justify-content: center;
+        width: 92px;
+        height: 92px;
+        border-radius: 24px;
+        background: linear-gradient(145deg, #0d6efd, #10b9dc);
+        color: #fff;
+        font-size: 2rem;
+        transform: rotate(-5deg);
+    }
+    .promo-empty-art span {
+        position: absolute;
+        top: -9px;
+        right: -9px;
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 3px solid #fff;
+        border-radius: 50%;
+        background: #ffc107;
+        color: #172033;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+    .promo-empty-copy {
+        flex: 1;
+    }
+    .promo-empty-copy h2 {
+        color: #172033;
+        font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+    }
+    .promo-empty-copy p {
+        color: #667085;
+    }
+    .promo-kicker {
+        color: #0d6efd;
+        font-size: .82rem;
+        font-weight: 600;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+    .promo-heading-accent {
+        color: #0d6efd;
+    }
+    .promo-card {
+        position: relative;
+        min-height: 285px;
+        overflow: hidden;
+        isolation: isolate;
+        border-radius: 22px;
+        color: #fff;
+        box-shadow: 0 12px 30px rgba(23, 32, 51, .12);
+        transition: transform .25s ease, box-shadow .25s ease;
+    }
+    .promo-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 18px 38px rgba(23, 32, 51, .18);
+    }
+    .promo-theme-0 { background: linear-gradient(135deg, #123f91 0%, #0879ed 58%, #22b8cf 100%); }
+    .promo-theme-1 { background: linear-gradient(135deg, #5a238b 0%, #9b3dc5 58%, #e35c94 100%); }
+    .promo-theme-2 { background: linear-gradient(135deg, #075e54 0%, #0b9b84 58%, #55c99b 100%); }
+    .promo-theme-3 { background: linear-gradient(135deg, #a53d23 0%, #e46a27 58%, #ffb13b 100%); }
+    .promo-card-glow {
+        position: absolute;
+        z-index: -1;
+        width: 230px;
+        height: 230px;
+        right: -80px;
+        bottom: -125px;
+        border: 1px solid rgba(255,255,255,.2);
+        border-radius: 50%;
+        box-shadow: 0 0 0 28px rgba(255,255,255,.06), 0 0 0 58px rgba(255,255,255,.04);
+    }
+    .promo-card-content {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-height: 285px;
+        padding: 1.45rem;
+    }
+    .promo-status {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid rgba(255,255,255,.25);
+        border-radius: 999px;
+        background: rgba(255,255,255,.16);
+        padding: .38rem .75rem;
+        color: #fff;
+        font-size: .78rem;
+        font-weight: 500;
+    }
+    .promo-status-upcoming {
+        color: #fff3c4;
+        background: rgba(35, 25, 0, .22);
+    }
+    .promo-ticket-icon {
+        color: rgba(255,255,255,.66);
+        font-size: 1.4rem;
+        transform: rotate(-12deg);
+    }
+    .promo-discount {
+        display: flex;
+        align-items: flex-start;
+        line-height: .9;
+    }
+    .promo-discount-number {
+        font-size: 3.65rem;
+        font-weight: 700;
+        letter-spacing: -.06em;
+    }
+    .promo-discount-symbol {
+        margin: .15rem 0 0 .1rem;
+        font-size: 1.6rem;
+        font-weight: 600;
+    }
+    .promo-discount-label {
+        align-self: flex-end;
+        margin: 0 0 .25rem .55rem;
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .13em;
+        opacity: .8;
+    }
+    .promo-title {
+        margin: .8rem 0 .2rem;
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+    .promo-condition,
+    .promo-validity {
+        color: rgba(255,255,255,.82);
+        font-size: .88rem;
+    }
+    .promo-validity {
+        margin-top: auto;
+        padding-top: .6rem;
+        font-size: .8rem;
+    }
+    .promo-card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: .75rem;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(255,255,255,.2);
+    }
+    .promo-code {
+        max-width: 62%;
+        overflow: hidden;
+        border: 1px dashed rgba(255,255,255,.56);
+        border-radius: 8px;
+        padding: .38rem .62rem;
+        color: #fff;
+        font-size: .8rem;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .promo-code-auto {
+        border-style: solid;
+        color: rgba(255,255,255,.92);
+        font-weight: 400;
+    }
+    .promo-cta {
+        flex-shrink: 0;
+        color: #fff;
+        font-size: .9rem;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .promo-cta:hover {
+        color: #fff3c4;
+        text-decoration: underline;
+    }
+    @@media (max-width: 767.98px) {
+        .promo-empty {
+            flex-wrap: wrap;
+            gap: 1rem;
+            border-radius: 18px;
+        }
+        .promo-empty-art {
+            flex-basis: 68px;
+            width: 68px;
+            height: 68px;
+            border-radius: 18px;
+            font-size: 1.55rem;
+        }
+        .promo-empty-copy {
+            flex-basis: calc(100% - 85px);
+        }
+        .promo-empty .btn {
+            width: 100%;
+        }
+    }
     .car-card:hover {
         transform: translateY(-8px);
         box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1) !important;

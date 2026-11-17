@@ -5,10 +5,98 @@
     Layout = "~/Views/Shared/_CustomerLayout.cshtml";
     var cars = (List<CarModel>)ViewBag.Cars;
     var inspections = (List<CarInspectionModel>)ViewBag.Inspections;
+    var releaseBookings = (List<BookingModel>)ViewBag.ReleaseInspectionBookings;
+    var inspectableReleaseBookingIds = (HashSet<int>)ViewBag.InspectableReleaseBookingIds;
 }
 
 <div class="container my-5">
     <h2 class="fw-bold mb-4">ทีมเซอร์วิส — ตรวจสภาพและซ่อมบำรุง</h2>
+    @if (TempData["ServiceMessage"] is string serviceMessage)
+    {
+        <div class="alert alert-info">@serviceMessage</div>
+    }
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-bold"><i class="fa-solid fa-clipboard-check text-primary me-2"></i>ตรวจรถก่อนปล่อยเช่า</div>
+        <div class="card-body">
+            <p class="text-muted small">ตรวจเลขไมล์ น้ำมัน และสภาพรถก่อนส่งมอบ พนักงานจะส่งมอบรถได้เมื่อผลตรวจล่าสุดผ่านและรถไม่มีงานซ่อมค้าง</p>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>รายการจอง / ลูกค้า</th><th>รถ / กำหนดรับ</th><th>ผลตรวจ</th></tr></thead>
+                    <tbody>
+                    @foreach (var booking in releaseBookings)
+                    {
+                        var car = cars.FirstOrDefault(item => item.CarId == booking.CarId);
+                        <tr>
+                            <td>
+                                <strong>#BK-@booking.BookingId</strong>
+                                <span class="d-block text-muted small">@booking.UserId</span>
+                            </td>
+                            <td>
+                                <strong>@booking.CarModel</strong>
+                                <span class="d-block text-muted small">รับ @booking.PickupDate @booking.PickupTime</span>
+                                <span class="badge @(car?.Status == "ว่าง" ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning-emphasis")">
+                                    @(car?.Status ?? "ไม่พบรถ")
+                                </span>
+                            </td>
+                            <td style="min-width: 360px;">
+                                @if (inspectableReleaseBookingIds.Contains(booking.BookingId))
+                                {
+                                <form asp-action="InspectBeforeRelease" method="post" class="row g-2">
+                                    <input type="hidden" name="bookingId" value="@booking.BookingId" />
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">เลขไมล์</label>
+                                        <input name="mileage" type="number" min="0" class="form-control form-control-sm" required />
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">น้ำมัน (%)</label>
+                                        <input name="fuelLevel" type="number" min="0" max="100" class="form-control form-control-sm" required />
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small mb-1">ค่าซ่อมโดยประมาณ (กรณีไม่ผ่าน)</label>
+                                        <input name="damageAmount" type="number" min="0" step="0.01" value="0" class="form-control form-control-sm" />
+                                    </div>
+                                    <div class="col-12 d-flex gap-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="readyForRental" value="true" id="ready-@booking.BookingId" required />
+                                            <label class="form-check-label small" for="ready-@booking.BookingId">ผ่าน / พร้อมปล่อย</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="readyForRental" value="false" id="failed-@booking.BookingId" />
+                                            <label class="form-check-label small" for="failed-@booking.BookingId">ไม่ผ่าน / แจ้งซ่อม</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small mb-1">หมายเหตุ / ตำหนิ (ต้องกรอกเมื่อไม่ผ่าน)</label>
+                                        <input name="conditionNotes" maxlength="2000" class="form-control form-control-sm" />
+                                    </div>
+                                    <div class="col-12 text-end">
+                                        <button class="btn btn-sm btn-primary" type="submit">
+                                            <i class="fa-solid fa-floppy-disk me-1"></i>บันทึกผลตรวจ
+                                        </button>
+                                    </div>
+                                </form>
+                                }
+                                else
+                                {
+                                    <div class="small text-warning-emphasis">
+                                        <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                                        ต้องซ่อมให้เสร็จและเปลี่ยนสถานะรถเป็น “ว่าง” ก่อนตรวจปล่อย
+                                    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (releaseBookings.Count == 0)
+                    {
+                        <tr><td colspan="3" class="text-center text-muted py-4">ไม่มีรายการรอตรวจรถก่อนปล่อยเช่า</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <div class="card shadow-sm mb-4">
         <div class="card-header fw-bold">แจ้งซ่อม / แจ้งปัญหารถ</div>
         <div class="card-body">

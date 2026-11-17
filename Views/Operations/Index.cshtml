@@ -4,6 +4,7 @@
     ViewData["Title"] = "งานรับ-คืนรถ";
     Layout = "~/Views/Shared/_CustomerLayout.cshtml";
     var latestInspections = (Dictionary<int, CarInspectionModel>)ViewBag.LatestInspections;
+    var readyForPickupBookingIds = (HashSet<int>)ViewBag.ReadyForPickupBookingIds;
 }
 
 <div class="container my-5">
@@ -46,13 +47,23 @@
                     }
                     @if (booking.LicenseStatus == "approved")
                     {
-                        <form asp-action="Pickup" method="post" class="row g-2 align-items-end mt-3">
-                            <input type="hidden" name="bookingId" value="@booking.BookingId" />
-                            <div class="col-sm-3"><label class="form-label">เลขไมล์ส่งมอบ</label><input name="mileage" type="number" min="0" class="form-control" required /></div>
-                            <div class="col-sm-3"><label class="form-label">น้ำมัน (%)</label><input name="fuelLevel" type="number" min="0" max="100" class="form-control" required /></div>
-                            <div class="col-sm-4"><label class="form-label">สภาพ/ตำหนิ</label><input name="conditionNotes" maxlength="2000" class="form-control" /></div>
-                            <div class="col-sm-2"><button class="btn btn-primary w-100">บันทึกส่งมอบ</button></div>
-                        </form>
+                        @if (readyForPickupBookingIds.Contains(booking.BookingId))
+                        {
+                            <form asp-action="Pickup" method="post" class="row g-2 align-items-end mt-3">
+                                <input type="hidden" name="bookingId" value="@booking.BookingId" />
+                                <div class="col-sm-3"><label class="form-label">เลขไมล์ส่งมอบ</label><input name="mileage" type="number" min="0" class="form-control" required /></div>
+                                <div class="col-sm-3"><label class="form-label">น้ำมัน (%)</label><input name="fuelLevel" type="number" min="0" max="100" class="form-control" required /></div>
+                                <div class="col-sm-4"><label class="form-label">สภาพ/ตำหนิ</label><input name="conditionNotes" maxlength="2000" class="form-control" /></div>
+                                <div class="col-sm-2"><button class="btn btn-primary w-100">บันทึกส่งมอบ</button></div>
+                            </form>
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning mt-3 mb-0">
+                                <i class="fa-solid fa-hourglass-half me-1"></i>
+                                รอทีมเซอร์วิสตรวจรถก่อนปล่อย และตรวจให้แน่ใจว่ารถพร้อมใช้งาน
+                            </div>
+                        }
                     }
                 }
                 else if (booking.BookingStatus == "rented")
