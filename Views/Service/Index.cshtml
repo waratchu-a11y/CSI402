@@ -7,6 +7,8 @@
     var inspections = (List<CarInspectionModel>)ViewBag.Inspections;
     var releaseBookings = (List<BookingModel>)ViewBag.ReleaseInspectionBookings;
     var inspectableReleaseBookingIds = (HashSet<int>)ViewBag.InspectableReleaseBookingIds;
+    var returnReviewBookings = (List<BookingModel>)ViewBag.ReturnReviewBookings;
+    var returnReceivedInspections = (Dictionary<int, CarInspectionModel>)ViewBag.ReturnReceivedInspections;
 }
 
 <div class="container my-5">
@@ -90,6 +92,80 @@
                     @if (releaseBookings.Count == 0)
                     {
                         <tr><td colspan="3" class="text-center text-muted py-4">ไม่มีรายการรอตรวจรถก่อนปล่อยเช่า</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-bold"><i class="fa-solid fa-car-burst text-warning me-2"></i>ตรวจรถหลังลูกค้าคืน</div>
+        <div class="card-body">
+            <p class="text-muted small">ตรวจรูปที่ลูกค้าส่งและบันทึกจากพนักงานรับรถ จากนั้นยืนยันว่าพบความเสียหายหรือไม่</p>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>รายการจอง / ลูกค้า</th><th>หลักฐานจากลูกค้า</th><th>ผลรับรถจากพนักงาน</th><th>ผลตรวจทีมช่าง</th></tr></thead>
+                    <tbody>
+                    @foreach (var booking in returnReviewBookings)
+                    {
+                        var returnImages = booking.ReturnImagePaths?.Split('|', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+                        <tr>
+                            <td>
+                                <strong>#BK-@booking.BookingId — @booking.CarModel</strong>
+                                <span class="d-block text-muted small">@booking.UserId</span>
+                            </td>
+                            <td>
+                                <span class="d-block small">ลูกค้าแจ้งเลขไมล์ @booking.ReturnMileage กม.</span>
+                                <div class="d-flex flex-wrap gap-2 mt-1">
+                                    @for (int imageIndex = 0; imageIndex < returnImages.Length; imageIndex++)
+                                    {
+                                        <a asp-controller="Payment" asp-action="ReturnPhoto"
+                                           asp-route-bookingId="@booking.BookingId" asp-route-imageIndex="@imageIndex"
+                                           target="_blank" rel="noopener">เปิดรูปที่ @(imageIndex + 1)</a>
+                                    }
+                                </div>
+                            </td>
+                            <td>
+                                @if (returnReceivedInspections.TryGetValue(booking.BookingId, out var receivedInspection))
+                                {
+                                    <span class="d-block small">เลขไมล์ @receivedInspection.Mileage กม.</span>
+                                    <span class="d-block small">น้ำมัน @receivedInspection.FuelLevel%</span>
+                                    <span class="d-block small text-muted">@receivedInspection.ConditionNotes</span>
+                                }
+                            </td>
+                            <td style="min-width: 340px;">
+                                <form asp-action="InspectAfterReturn" method="post" class="row g-2">
+                                    <input type="hidden" name="bookingId" value="@booking.BookingId" />
+                                    <div class="col-12 d-flex gap-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="damageFound" value="false" id="no-damage-@booking.BookingId" required />
+                                            <label class="form-check-label small" for="no-damage-@booking.BookingId">ไม่พบความเสียหาย</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="damageFound" value="true" id="damage-@booking.BookingId" />
+                                            <label class="form-check-label small" for="damage-@booking.BookingId">พบความเสียหาย</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-5">
+                                        <label class="form-label small mb-1">ประเมินค่าซ่อม</label>
+                                        <input name="damageAmount" type="number" min="0" step="0.01" value="0" class="form-control form-control-sm" required />
+                                    </div>
+                                    <div class="col-7">
+                                        <label class="form-label small mb-1">รายละเอียดผลตรวจ</label>
+                                        <input name="conditionNotes" maxlength="2000" class="form-control form-control-sm"
+                                               placeholder="ระบุความเสียหาย หรือไม่พบความเสียหาย" required />
+                                    </div>
+                                    <div class="col-12 text-end">
+                                        <button class="btn btn-sm btn-warning" type="submit">บันทึกผลตรวจหลังคืน</button>
+                                    </div>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    @if (returnReviewBookings.Count == 0)
+                    {
+                        <tr><td colspan="4" class="text-center text-muted py-4">ไม่มีรถรอตรวจหลังคืน</td></tr>
                     }
                     </tbody>
                 </table>

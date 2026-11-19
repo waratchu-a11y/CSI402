@@ -387,12 +387,45 @@ namespace warat_0583_l005.Controllers
         public IActionResult Lab52(string? UserId = null, string? CarModel = null, string? PickupLocation = null, string? PickupDate = null, string? ReturnDate = null, int RentalDays = 0, decimal PricePerDay = 0, decimal TotalPrice = 0)
         {
             // ดึงข้อมูลรายการรถยนต์ทั้งหมดส่งไปให้หน้า View (Lab52.cshtml)
-            ViewBag.Cars = _db.Set<CarModel>().ToList();
+            var cars = _db.Set<CarModel>().ToList();
+            ViewBag.Cars = cars;
+            var selectedCar = cars.FirstOrDefault(car => car.CarName == CarModel);
+            string selectedPickupLocation = CarLocationOptions.IsValid(PickupLocation)
+                ? PickupLocation!
+                : CarLocationOptions.IsValid(selectedCar?.Location)
+                    ? selectedCar!.Location!
+                    : CarLocationOptions.All[0];
+            DateTime pickupDate = TryParseFormDate(PickupDate ?? string.Empty, out DateTime parsedPickupDate)
+                ? parsedPickupDate.Date
+                : DateTime.Today;
+            DateTime returnDate = TryParseFormDate(ReturnDate ?? string.Empty, out DateTime parsedReturnDate)
+                ? parsedReturnDate.Date
+                : pickupDate.AddDays(RentalDays is >= 1 and <= 30 ? RentalDays : 1);
+            if (returnDate <= pickupDate)
+            {
+                returnDate = pickupDate.AddDays(RentalDays is >= 1 and <= 30 ? RentalDays : 1);
+            }
+
+            var activeBookings = _db.Bookings
+                .Where(booking =>
+                    booking.BookingStatus == "pending" ||
+                    booking.BookingStatus == "pending_payment" ||
+                    booking.BookingStatus == "payment_review" ||
+                    booking.BookingStatus == "confirmed" ||
+                    booking.BookingStatus == "rented" ||
+                    booking.BookingStatus == "return_requested" ||
+                    booking.BookingStatus == "service_review")
+                .ToList();
+            ViewBag.UnavailableCarIds = cars
+                .Where(car => !CarAvailability.IsAvailable(car, activeBookings, pickupDate, returnDate))
+                .Select(car => car.CarId)
+                .ToHashSet();
             ViewBag.AddonServices = _db.AddOnServices.Where(service => service.IsActive).OrderBy(service => service.ServiceId).ToList();
 
             ViewBag.UserId = UserId;
             ViewBag.CarModel = CarModel;
-            ViewBag.PickupLocation = PickupLocation;
+            ViewBag.PickupLocation = selectedPickupLocation;
+            ViewBag.CarLocations = CarLocationOptions.All;
             ViewBag.PickupDate = PickupDate;
             ViewBag.ReturnDate = ReturnDate;
             ViewBag.RentalDays = RentalDays;
@@ -470,7 +503,7 @@ namespace warat_0583_l005.Controllers
             }
 
             if (string.IsNullOrWhiteSpace(carModel) ||
-                string.IsNullOrWhiteSpace(pickupLocation) ||
+                !CarLocationOptions.IsValid(pickupLocation) ||
                 string.IsNullOrWhiteSpace(returnLocation) ||
                 rentalDays is < 1 or > 30 ||
                 pickupDate.Date < DateTime.Today ||
@@ -485,6 +518,16 @@ namespace warat_0583_l005.Controllers
             if (car is null)
             {
                 return NotFound("ไม่พบรถที่เลือก");
+            }
+
+            if (!CarLocationOptions.IsValid(car.Location))
+            {
+                return Conflict("รถคันนี้ยังไม่ได้กำหนดที่ตั้ง กรุณาติดต่อผู้ดูแลระบบ");
+            }
+
+            if (!string.Equals(car.Location, pickupLocation, StringComparison.Ordinal))
+            {
+                return Conflict($"รถคันนี้อยู่ที่ {car.Location} กรุณาเลือกจุดรับรถให้ตรงกับที่ตั้งรถ");
             }
 
             if (!IsCarAvailable(car, pickupDate.Date, rentalDays))
@@ -575,7 +618,7 @@ namespace warat_0583_l005.Controllers
             }
 
             if (string.IsNullOrWhiteSpace(carModel) ||
-                string.IsNullOrWhiteSpace(pickupLocation) ||
+                !CarLocationOptions.IsValid(pickupLocation) ||
                 string.IsNullOrWhiteSpace(returnLocation) ||
                 rentalDays is < 1 or > 30 ||
                 parsedPickupDate.Date < DateTime.Today ||
@@ -594,6 +637,16 @@ namespace warat_0583_l005.Controllers
             if (car is null)
             {
                 return NotFound("ไม่พบรถที่เลือก");
+            }
+
+            if (!CarLocationOptions.IsValid(car.Location))
+            {
+                return Conflict("รถคันนี้ยังไม่ได้กำหนดที่ตั้ง กรุณาติดต่อผู้ดูแลระบบ");
+            }
+
+            if (!string.Equals(car.Location, pickupLocation, StringComparison.Ordinal))
+            {
+                return Conflict($"รถคันนี้อยู่ที่ {car.Location} กรุณาเลือกจุดรับรถให้ตรงกับที่ตั้งรถ");
             }
 
             if (!IsCarAvailable(car, parsedPickupDate.Date, rentalDays))
@@ -674,7 +727,9 @@ namespace warat_0583_l005.Controllers
                      booking.BookingStatus == "pending_payment" ||
                      booking.BookingStatus == "payment_review" ||
                      booking.BookingStatus == "confirmed" ||
-                     booking.BookingStatus == "rented"))
+                     booking.BookingStatus == "rented" ||
+                     booking.BookingStatus == "return_requested" ||
+                     booking.BookingStatus == "service_review"))
                 .ToList();
 
             return CarAvailability.IsAvailable(car, existingBookings, pickupDate, returnDate);

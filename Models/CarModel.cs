@@ -30,5 +30,8 @@ namespace warat_0583_l005.Models
 
         [Column("Seats")]
         public int? Seats { get; set; }
+
+        [Column("Location")]
+        public string? Location { get; set; }
     }
 }

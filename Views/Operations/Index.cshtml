@@ -18,7 +18,10 @@
         <div class="card shadow-sm mb-4">
             <div class="card-header d-flex justify-content-between">
                 <strong>Booking #@booking.BookingId — @booking.CarModel</strong>
-                <span>@booking.BookingStatus / ใบขับขี่: @booking.LicenseStatus</span>
+                <span>
+                    @(booking.BookingStatus == "return_requested" ? "ลูกค้าแจ้งคืนรถแล้ว" : booking.BookingStatus)
+                    / ใบขับขี่: @booking.LicenseStatus
+                </span>
             </div>
             <div class="card-body">
                 <p class="mb-2">ลูกค้า: @booking.UserId | รับ @booking.PickupDate @booking.PickupTime — คืน @booking.ReturnDate?.ToString("yyyy-MM-dd") @booking.ReturnTime</p>
@@ -30,6 +33,25 @@
                 @if (latestInspections.TryGetValue(booking.BookingId, out var inspection))
                 {
                     <p class="text-muted mt-2 mb-0">ผลตรวจล่าสุด: @inspection.InspectionStage, เลขไมล์ @inspection.Mileage กม., น้ำมัน @inspection.FuelLevel%</p>
+                }
+                @if (booking.BookingStatus == "return_requested")
+                {
+                    var returnImages = booking.ReturnImagePaths?.Split('|', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+                    <div class="alert alert-info mt-3 mb-0">
+                        ลูกค้าแจ้งเลขไมล์คืนรถ @booking.ReturnMileage กม.
+                        @if (booking.ReturnSubmittedAt.HasValue)
+                        {
+                            <span> เมื่อ @booking.ReturnSubmittedAt.Value.ToString("g")</span>
+                        }
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            @for (int imageIndex = 0; imageIndex < returnImages.Length; imageIndex++)
+                            {
+                                <a asp-controller="Payment" asp-action="ReturnPhoto"
+                                   asp-route-bookingId="@booking.BookingId" asp-route-imageIndex="@imageIndex"
+                                   target="_blank" rel="noopener">เปิดรูปที่ @(imageIndex + 1)</a>
+                            }
+                        </div>
+                    </div>
                 }
 
                 @if (booking.BookingStatus == "confirmed")
@@ -66,16 +88,25 @@
                         }
                     }
                 }
+                else if (booking.BookingStatus == "return_requested")
+                {
+                    <div class="alert alert-warning mt-3 mb-0">
+                        <i class="fa-solid fa-bell me-1"></i>
+                        ตรวจรูปรถและเลขไมล์ที่ลูกค้าส่งมา แล้วตรวจรถจริงก่อนส่งต่อทีมเซอร์วิส
+                    </div>
+                    <form asp-action="ReceiveReturn" method="post" class="row g-2 align-items-end mt-3">
+                        <input type="hidden" name="bookingId" value="@booking.BookingId" />
+                        <div class="col-sm-3"><label class="form-label">เลขไมล์ที่พนักงานตรวจ</label><input name="mileage" type="number" min="0" class="form-control" required /></div>
+                        <div class="col-sm-2"><label class="form-label">น้ำมัน (%)</label><input name="fuelLevel" type="number" min="0" max="100" class="form-control" required /></div>
+                        <div class="col-sm-5"><label class="form-label">หมายเหตุตอนรับรถ</label><input name="conditionNotes" maxlength="2000" class="form-control" /></div>
+                        <div class="col-sm-2"><button class="btn btn-warning w-100">รับรถ / ส่งทีมช่าง</button></div>
+                    </form>
+                }
                 else if (booking.BookingStatus == "rented")
                 {
-                    <form asp-action="Return" method="post" class="row g-2 align-items-end mt-3">
-                        <input type="hidden" name="bookingId" value="@booking.BookingId" />
-                        <div class="col-sm-2"><label class="form-label">เลขไมล์คืน</label><input name="mileage" type="number" min="0" class="form-control" required /></div>
-                        <div class="col-sm-2"><label class="form-label">น้ำมัน (%)</label><input name="fuelLevel" type="number" min="0" max="100" class="form-control" required /></div>
-                        <div class="col-sm-3"><label class="form-label">ค่าความเสียหาย</label><input name="damageAmount" type="number" min="0" step="0.01" value="0" class="form-control" required /></div>
-                        <div class="col-sm-3"><label class="form-label">สภาพ/ตำหนิ</label><input name="conditionNotes" maxlength="2000" class="form-control" /></div>
-                        <div class="col-sm-2"><button class="btn btn-warning w-100">บันทึกรับคืน</button></div>
-                    </form>
+                    <div class="alert alert-light mt-3 mb-0">
+                        รอลูกค้าแจ้งคืนรถ พร้อมส่งรูปภาพและเลขไมล์ผ่านหน้าประวัติการจอง
+                    </div>
                 }
             </div>
         </div>

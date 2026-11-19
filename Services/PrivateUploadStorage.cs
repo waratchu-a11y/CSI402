@@ -61,6 +61,22 @@ public sealed class PrivateUploadStorage
             : null;
     }
 
+    public void Delete(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName) ||
+            Path.GetFileName(fileName) != fileName ||
+            fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            return;
+        }
+
+        string path = Path.Combine(_uploadDirectory, fileName);
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+    }
+
     public static string? GetImageContentType(string fileName) =>
         Path.GetExtension(fileName).ToLowerInvariant() switch
         {

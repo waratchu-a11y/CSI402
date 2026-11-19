@@ -9,6 +9,8 @@
     string returnDateValue = ViewBag.ReturnDate as string
         ?? DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
     string pickupLocationValue = ViewBag.PickupLocation as string ?? "สนามบินสุวรรณภูมิ";
+    var carLocations = ViewBag.CarLocations as string[] ?? Array.Empty<string>();
+    var unavailableCarIds = ViewBag.UnavailableCarIds as HashSet<int> ?? new HashSet<int>();
 }
 
 <div class="container my-5">
@@ -38,47 +40,42 @@
                             <div class="col-md-6">
                                 <label class="form-label fw-bold text-secondary small">เลือกรุ่นรถ</label>
                                 <select id="carSelect" name="CarModel" class="form-select form-select-lg border-2 shadow-none" style="border-radius: 12px;" onchange="updatePrice()">
+                                    <option value="" disabled selected="@(string.IsNullOrWhiteSpace(ViewBag.CarModel as string))">เลือกรถที่สาขานี้</option>
                                     @if (ViewBag.Cars != null)
                                     {
                                         var cars = (List<warat_0583_l005.Models.CarModel>)ViewBag.Cars;
                                         foreach (var car in cars)
                                         {
-                                            bool isNotAvailable = car.Status != "ว่าง";
-
-                                            if (isNotAvailable)
-                                            {
-                                                <option value="@car.CarName" data-price="@car.PricePerDay" disabled class="text-danger bg-light">
-                                                    @car.CarName (฿@car.PricePerDay.ToString("N0")/วัน) - ❌ ไม่ว่าง (@car.Status)
-                                                </option>
-                                            }
-                                            else
-                                            {
-                                                <option value="@car.CarName" data-price="@car.PricePerDay" selected="@(car.CarName == (ViewBag.CarModel as string))">
-                                                    @car.CarName - @(car.TransmissionType == "automatic" ? "เกียร์อัตโนมัติ" : car.TransmissionType == "manual" ? "เกียร์ธรรมดา" : "ไม่ระบุเกียร์"), @(car.Seats?.ToString() ?? "ไม่ระบุ") ที่นั่ง (฿@car.PricePerDay.ToString("N0")/วัน)
-                                                </option>
-                                            }
+                                            bool isNotAvailable = car.Status != "ว่าง" || unavailableCarIds.Contains(car.CarId);
+                                            <option value="@car.CarName" data-price="@car.PricePerDay"
+                                                    data-location="@car.Location" data-available="@(!isNotAvailable ? "true" : "false")"
+                                                    selected="@(car.CarName == (ViewBag.CarModel as string) && !isNotAvailable)"
+                                                    class="@(isNotAvailable ? "text-danger bg-light" : "")">
+                                                @car.CarName - @(car.TransmissionType == "automatic" ? "เกียร์อัตโนมัติ" : car.TransmissionType == "manual" ? "เกียร์ธรรมดา" : "ไม่ระบุเกียร์"), @(car.Seats?.ToString() ?? "ไม่ระบุ") ที่นั่ง (฿@car.PricePerDay.ToString("N0")/วัน)@(isNotAvailable ? $" - ไม่ว่าง ({(car.Status != "ว่าง" ? car.Status : "มีรายการจองในช่วงวันที่เลือก")})" : "")
+                                            </option>
                                         }
                                     }
                                 </select>
+                                <small id="carLocationMessage" class="text-danger d-none" role="status">ไม่มีรถที่พร้อมให้จองในสาขาที่เลือก</small>
                             </div>
 
                             <!-- สถานที่รับและคืนรถ -->
                             <div class="col-md-6">
                                 <label class="form-label fw-bold text-secondary small">สถานที่รับรถ</label>
-                                <select name="PickupLocation" class="form-select form-select-lg border-2 shadow-none" style="border-radius: 12px;" required>
-                                    <option value="สนามบินสุวรรณภูมิ" selected="@(pickupLocationValue == "สนามบินสุวรรณภูมิ")">สนามบินสุวรรณภูมิ</option>
-                                    <option value="สนามบินดอนเมือง" selected="@(pickupLocationValue == "สนามบินดอนเมือง")">สนามบินดอนเมือง</option>
-                                    <option value="เชียงใหม่" selected="@(pickupLocationValue == "เชียงใหม่")">เชียงใหม่</option>
-                                    <option value="ภูเก็ต" selected="@(pickupLocationValue == "ภูเก็ต")">ภูเก็ต</option>
+                                <select id="pickupLocation" name="PickupLocation" class="form-select form-select-lg border-2 shadow-none" style="border-radius: 12px;" onchange="filterCarsByLocation()" required>
+                                    @foreach (var location in carLocations)
+                                    {
+                                        <option value="@location" selected="@(pickupLocationValue == location)">@location</option>
+                                    }
                                 </select>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-bold text-secondary small">สถานที่คืนรถ</label>
                                 <select name="ReturnLocation" class="form-select form-select-lg border-2 shadow-none" style="border-radius: 12px;" required>
-                                    <option value="สนามบินสุวรรณภูมิ">สนามบินสุวรรณภูมิ</option>
-                                    <option value="สนามบินดอนเมือง">สนามบินดอนเมือง</option>
-                                    <option value="เชียงใหม่">เชียงใหม่</option>
-                                    <option value="ภูเก็ต">ภูเก็ต</option>
+                                    @foreach (var location in carLocations)
+                                    {
+                                        <option value="@location">@location</option>
+                                    }
                                 </select>
                             </div>
 
@@ -171,7 +168,7 @@
                             <a href="~/Home/Indexcustomer" class="btn btn-outline-secondary px-4 fw-bold" style="border-radius: 12px;">
                                 <i class="fa-solid fa-arrow-left me-1"></i> กลับหน้าแรก
                             </a>
-                            <button type="submit" class="btn btn-warning px-5 py-2 fw-bold text-dark shadow-sm" style="border-radius: 12px;">
+                            <button id="continueBookingButton" type="submit" class="btn btn-warning px-5 py-2 fw-bold text-dark shadow-sm" style="border-radius: 12px;">
                                 ดำเนินการจองต่อ <i class="fa-solid fa-arrow-right ms-1"></i>
                             </button>
                         </div>
@@ -344,10 +341,40 @@
         }
     }
 
+    function filterCarsByLocation() {
+        const carSelect = document.getElementById('carSelect');
+        const pickupLocation = document.getElementById('pickupLocation').value;
+        const placeholder = carSelect.options[0];
+        let hasAvailableCar = false;
+        let selectedOptionMatches = false;
+
+        Array.from(carSelect.options).slice(1).forEach(option => {
+            const matchesLocation = option.dataset.location === pickupLocation;
+            const isAvailable = option.dataset.available === 'true';
+            option.hidden = !matchesLocation;
+            option.disabled = !matchesLocation || !isAvailable;
+            if (matchesLocation && isAvailable) {
+                hasAvailableCar = true;
+            }
+            if (option.selected && matchesLocation && isAvailable) {
+                selectedOptionMatches = true;
+            }
+        });
+
+        if (!selectedOptionMatches) {
+            placeholder.selected = true;
+        }
+
+        document.getElementById('carLocationMessage').classList.toggle('d-none', hasAvailableCar);
+        document.getElementById('continueBookingButton').disabled = !hasAvailableCar;
+        updatePrice();
+    }
+
     window.addEventListener('DOMContentLoaded', (event) => {
         const carSelect = document.getElementById('carSelect');
         
         if (carSelect) carSelect.addEventListener('change', updatePrice);
+        filterCarsByLocation();
         syncRentalDates();
         document.getElementById('pickupDate')?.addEventListener('change', () => {
             syncRentalDates();

@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "จัดการข้อมูลรถเช่า - Admin";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var carLocations = (string[])ViewBag.CarLocations;
 }
 
 <div class="container my-5">
@@ -44,6 +45,7 @@
                         <tr>
                             <th class="py-3 px-4">รูปภาพ</th>
                             <th class="py-3">ชื่อรุ่นรถยนต์</th>
+                            <th class="py-3">ที่ตั้งรถ</th>
                             <th class="py-3">รายละเอียด / สเปก</th>
                             <th class="py-3">ราคา / วัน</th>
                             <th class="py-3 text-center">สถานะ</th>
@@ -60,6 +62,10 @@
                                         <img src="@car.ImageUrl" alt="@car.CarName" class="rounded border" style="width: 90px; height: 60px; object-fit: cover;" onerror="this.src='https://via.placeholder.com/90x60?text=No+Image';" />
                                     </td>
                                     <td class="fw-bold text-dark">@car.CarName</td>
+                                    <td>
+                                        <i class="fa-solid fa-location-dot text-primary me-1"></i>
+                                        @(string.IsNullOrWhiteSpace(car.Location) ? "ยังไม่ระบุที่ตั้ง" : car.Location)
+                                    </td>
                                     <td class="text-muted small">
                                         @car.Details
                                         <span class="d-block">@(car.TransmissionType == "automatic" ? "เกียร์อัตโนมัติ" : "เกียร์ธรรมดา") / @(car.Seats ?? 0) ที่นั่ง</span>
@@ -91,7 +97,7 @@
                                     </td>
                                 </tr>
                                 <tr id="edit-car-@car.CarId" class="d-none bg-light">
-                                    <td colspan="6" class="p-4">
+                                    <td colspan="7" class="p-4">
                                         <form asp-action="EditCar" method="post">
                                             <input type="hidden" name="CarId" value="@car.CarId" />
                                             <div class="row g-3">
@@ -123,10 +129,21 @@
                                                     <select name="Status" class="form-select" required>
                                                         <option value="ว่าง" selected="@(car.Status == "ว่าง")">ว่าง</option>
                                                         <option value="ไม่ว่าง" selected="@(car.Status == "ไม่ว่าง")">ไม่ว่าง</option>
+                                                        <option value="รอตรวจสภาพ" selected="@(car.Status == "รอตรวจสภาพ")">รอตรวจสภาพหลังคืน</option>
                                                         <option value="อยู่ระหว่างซ่อม" selected="@(car.Status == "อยู่ระหว่างซ่อม")">อยู่ระหว่างซ่อม</option>
                                                     </select>
                                                 </div>
-                                                <div class="col-md-9">
+                                                <div class="col-md-3">
+                                                    <label class="form-label fw-bold small">ที่ตั้งรถ</label>
+                                                    <select name="Location" class="form-select" required>
+                                                        <option value="">เลือกที่ตั้งรถ</option>
+                                                        @foreach (string location in carLocations)
+                                                        {
+                                                            <option value="@location" selected="@(car.Location == location)">@location</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
                                                     <label class="form-label fw-bold small">ลิงก์รูปภาพ</label>
                                                     <input type="text" name="ImageUrl" value="@car.ImageUrl" class="form-control" maxlength="255" required />
                                                 </div>
@@ -147,7 +164,7 @@
                         else
                         {
                             <tr>
-                                <td colspan="6" class="text-center py-5 text-muted">
+                                <td colspan="7" class="text-center py-5 text-muted">
                                     <i class="fa-solid fa-car-rear fa-3x mb-3 text-secondary"></i>
                                     <h5>ยังไม่มีข้อมูลรถยนต์ในระบบ</h5>
                                     <p class="small m-0">กดปุ่ม "เพิ่มรถยนต์ใหม่" ด้านบนเพื่อเพิ่มข้อมูลรถยนต์คันแรก</p>
@@ -208,6 +225,16 @@
                     <div class="mb-3">
                         <label class="form-label fw-bold small">รายละเอียดสเปกรถ</label>
                         <input type="text" name="Details" class="form-control" placeholder="เช่น 4 ที่นั่ง | อัตโนมัติ | 1.2L" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">ที่ตั้งรถ</label>
+                        <select name="Location" class="form-select" required>
+                            <option value="">เลือกที่ตั้งรถ</option>
+                            @foreach (string location in carLocations)
+                            {
+                                <option value="@location">@location</option>
+                            }
+                        </select>
                     </div>
                 </div>
 

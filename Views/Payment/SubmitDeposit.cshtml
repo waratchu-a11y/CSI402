@@ -23,6 +23,17 @@
                         กรุณาโอน <strong>฿@Model.DepositAmount.ToString("N2")</strong> เป็นเงินมัดจำ 10%
                         จากนั้นแนบรูปสลิปให้ฝ่ายการเงินตรวจสอบ
                     </div>
+                    @if (ViewBag.PromptPayQr is string promptPayQr)
+                    {
+                        <div class="border rounded-3 bg-light p-4 mb-3 text-center">
+                            <h5 class="fw-bold mb-1"><i class="fa-solid fa-qrcode text-primary me-2"></i>สแกน QR เพื่อชำระมัดจำ</h5>
+                            <p class="text-muted small mb-3">QR นี้ระบุยอดมัดจำและเลขอ้างอิงรายการจองให้อัตโนมัติ</p>
+                            <img src="@promptPayQr" alt="PromptPay QR สำหรับยอดมัดจำ ฿@Model.DepositAmount.ToString("N2")"
+                                 class="img-fluid bg-white border rounded-3 p-2" style="width: 260px; max-width: 100%;" />
+                            <div class="fw-bold text-primary mt-3">ยอดที่ต้องชำระ ฿@Model.DepositAmount.ToString("N2")</div>
+                            <div class="small text-muted">อ้างอิง Booking #@Model.BookingId</div>
+                        </div>
+                    }
                     @if (string.IsNullOrWhiteSpace((string?)ViewBag.BankAccount))
                     {
                         <div class="alert alert-danger">ยังไม่ได้ตั้งค่าบัญชีรับโอน กรุณาติดต่อผู้ดูแลระบบก่อนชำระเงิน</div>

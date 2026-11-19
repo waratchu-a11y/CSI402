@@ -1,4 +1,45 @@
-﻿<!DOCTYPE html>
+﻿@inject warat_0583_l005.Models.Csi402dbContext Db
+@{
+    int customerNotificationCount = 0;
+    if (User.IsInRole("Customer") && !string.IsNullOrWhiteSpace(User.Identity?.Name))
+    {
+        var customerBookings = Db.Bookings
+            .Where(booking => booking.UserId == User.Identity!.Name &&
+                (booking.BookingStatus == "pending_payment" ||
+                 booking.BookingStatus == "payment_rejected" ||
+                 booking.BookingStatus == "payment_review" ||
+                 booking.BookingStatus == "confirmed"))
+            .ToList();
+        var customerBookingIds = customerBookings.Select(booking => booking.BookingId).ToList();
+        var paymentsByBooking = Db.Payments
+            .Where(payment => customerBookingIds.Contains(payment.BookingId))
+            .ToList()
+            .ToLookup(payment => payment.BookingId);
+
+        foreach (var booking in customerBookings)
+        {
+            var payments = paymentsByBooking[booking.BookingId];
+            if (booking.BookingStatus is "pending_payment" or "payment_rejected" or "payment_review")
+            {
+                customerNotificationCount++;
+            }
+            else if (booking.BookingStatus == "confirmed")
+            {
+                decimal rentalPaid = payments
+                    .Where(payment => payment.PaymentType == "rental" && payment.PaymentStatus == "verified")
+                    .Sum(payment => payment.Amount);
+                bool rentalNeedsReview = payments.Any(payment =>
+                    payment.PaymentType == "rental" &&
+                    payment.PaymentStatus is "pending" or "rejected");
+                if (rentalNeedsReview || rentalPaid < booking.TotalPrice)
+                {
+                    customerNotificationCount++;
+                }
+            }
+        }
+    }
+}
+<!DOCTYPE html>
 <html lang="th">
 <head>
     <meta charset="utf-8" />
@@ -31,7 +72,9 @@
         }
     </style>
 </head>
-<body>
+<body data-notification-url="@(User.IsInRole("Customer") ? Url.Action("CustomerNotifications", "Home") : "")"
+      data-notification-user="@(User.Identity?.Name ?? "")"
+      data-admin-notification-user="@(User.Identity?.Name ?? "")">
     <!-- ======================= HEADER ======================= -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-custom py-3 shadow-sm">
         <div class="container">
@@ -51,7 +94,15 @@
                     </li>
                     <!-- 📌 เมนูประวัติการจอง (วางอยู่ระหว่างเลือกรถเช่า) -->
                     <li class="nav-item">
-                        <a class="nav-link text-white" href="~/Home/MyBookings"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการจอง</a>
+                        <a class="nav-link text-white" href="~/Home/MyBookings">
+                            <i class="fa-solid fa-clock-rotate-left"></i> ประวัติการจอง
+                            @if (User.IsInRole("Customer"))
+                            {
+                                <span id="customerNotificationBadge"
+                                      class="badge rounded-pill bg-danger ms-1 @(customerNotificationCount == 0 ? "d-none" : "")"
+                                      aria-label="มี @customerNotificationCount รายการที่ต้องติดตาม">@customerNotificationCount</span>
+                            }
+                        </a>
                     </li>
                 </ul>
                 
@@ -66,7 +117,11 @@
                         </a>
                         @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
                         {
-                            <a asp-controller="Admin" asp-action="Index" class="btn btn-outline-light rounded-pill px-3">ระบบหลังบ้าน</a>
+                            <a asp-controller="Admin" asp-action="Index" class="btn btn-outline-light rounded-pill px-3">
+                                ระบบหลังบ้าน
+                                <span id="adminBookingNotificationBadge" class="badge rounded-pill bg-danger ms-1 d-none"
+                                      aria-label="รายการจองที่รอดำเนินการ">0</span>
+                            </a>
                         }
                         else if (User.IsInRole("Finance"))
                         {
@@ -137,8 +192,125 @@
         </div>
     </footer>
 
+    @if (User.IsInRole("Customer"))
+    {
+        <div id="customerNotificationToasts"
+             class="toast-container position-fixed bottom-0 end-0 p-3"
+             aria-live="polite"
+             aria-atomic="true"
+             style="z-index: 1090;"></div>
+    }
+
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+    {
+        @await Html.PartialAsync("_AdminBookingNotifications")
+    }
+    @if (User.IsInRole("Customer"))
+    {
+        <script>
+            (() => {
+                const notificationUrl = document.body.dataset.notificationUrl;
+                const snapshotKey = `driverRentNotifications:${document.body.dataset.notificationUser}`;
+                const badge = document.getElementById('customerNotificationBadge');
+                const toastContainer = document.getElementById('customerNotificationToasts');
+                let previousSnapshot = {};
+                let hasPreviousSnapshot = false;
+                let isChecking = false;
+
+                try {
+                    const storedSnapshot = sessionStorage.getItem(snapshotKey);
+                    if (storedSnapshot !== null) {
+                        previousSnapshot = JSON.parse(storedSnapshot);
+                        hasPreviousSnapshot = true;
+                    }
+                } catch (error) {
+                    console.warn('Could not restore the notification snapshot.', error);
+                }
+
+                function showNotification(notification) {
+                    const toastElement = document.createElement('div');
+                    toastElement.className = 'toast text-bg-primary border-0 shadow';
+                    toastElement.setAttribute('role', 'alert');
+                    toastElement.setAttribute('aria-live', 'assertive');
+                    toastElement.setAttribute('aria-atomic', 'true');
+
+                    const header = document.createElement('div');
+                    header.className = 'toast-header';
+                    const title = document.createElement('strong');
+                    title.className = 'me-auto';
+                    title.textContent = 'DriverRent แจ้งเตือน';
+                    const closeButton = document.createElement('button');
+                    closeButton.type = 'button';
+                    closeButton.className = 'btn-close';
+                    closeButton.setAttribute('data-bs-dismiss', 'toast');
+                    closeButton.setAttribute('aria-label', 'ปิด');
+                    header.append(title, closeButton);
+
+                    const body = document.createElement('div');
+                    body.className = 'toast-body';
+                    const message = document.createElement('div');
+                    message.textContent = notification.message;
+                    const link = document.createElement('a');
+                    link.href = notification.url;
+                    link.className = 'btn btn-sm btn-light mt-2';
+                    link.textContent = 'ดูรายการจอง';
+                    body.append(message, link);
+
+                    toastElement.append(header, body);
+                    toastContainer.append(toastElement);
+                    toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove(), { once: true });
+                    new bootstrap.Toast(toastElement, { delay: 12000 }).show();
+                }
+
+                async function checkNotifications() {
+                    if (isChecking) return;
+                    isChecking = true;
+                    try {
+                        const response = await fetch(notificationUrl, {
+                            cache: 'no-store',
+                            credentials: 'same-origin'
+                        });
+                        if (!response.ok) {
+                            throw new Error(`Notification check failed with HTTP ${response.status}.`);
+                        }
+
+                        const state = await response.json();
+                        const currentSnapshot = {};
+                        for (const notification of state.notifications) {
+                            const signature = JSON.stringify({
+                                message: notification.message,
+                                amount: notification.amount
+                            });
+                            currentSnapshot[notification.id] = signature;
+                            if (hasPreviousSnapshot &&
+                                (!Object.prototype.hasOwnProperty.call(previousSnapshot, notification.id) ||
+                                 previousSnapshot[notification.id] !== signature)) {
+                                showNotification(notification);
+                            }
+                        }
+                        previousSnapshot = currentSnapshot;
+                        sessionStorage.setItem(snapshotKey, JSON.stringify(currentSnapshot));
+                        hasPreviousSnapshot = true;
+
+                        if (badge) {
+                            badge.textContent = state.count;
+                            badge.classList.toggle('d-none', state.count === 0);
+                            badge.setAttribute('aria-label', `มี ${state.count} รายการที่ต้องติดตาม`);
+                        }
+                    } catch (error) {
+                        console.error('Unable to check customer notifications.', error);
+                    } finally {
+                        isChecking = false;
+                    }
+                }
+
+                checkNotifications();
+                window.setInterval(checkNotifications, 15000);
+            })();
+        </script>
+    }
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

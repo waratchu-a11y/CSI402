@@ -7,11 +7,16 @@
 <div class="container my-5">
     <h2 class="fw-bold mb-3">ตั้งค่าบัญชีรับโอน</h2>
     @if (TempData["ManagementMessage"] is string message) { <div class="alert alert-success">@message</div> }
-    <div class="alert alert-warning">ลูกค้าจะเห็นข้อมูลบัญชีนี้ในขั้นตอนชำระเงิน โปรดตรวจสอบความถูกต้องก่อนเปิดใช้งาน</div>
+    <div class="alert alert-warning">ลูกค้าจะเห็นข้อมูลบัญชีและ QR PromptPay นี้ในขั้นตอนชำระเงิน โปรดตรวจสอบความถูกต้องก่อนเปิดใช้งาน</div>
     <form asp-action="SaveBankSettings" method="post" class="card card-body shadow-sm">
         <div class="mb-3"><label class="form-label">ธนาคาร</label><input name="bankName" value="@settings.GetValueOrDefault("BankName")" maxlength="100" class="form-control" /></div>
         <div class="mb-3"><label class="form-label">เลขบัญชี</label><input name="bankAccount" value="@settings.GetValueOrDefault("BankAccount")" maxlength="100" class="form-control" /></div>
         <div class="mb-3"><label class="form-label">ชื่อบัญชี</label><input name="bankAccountName" value="@settings.GetValueOrDefault("BankAccountName")" maxlength="150" class="form-control" /></div>
+        <div class="mb-3">
+            <label class="form-label">เบอร์ PromptPay สำหรับสร้าง QR ระบุยอด</label>
+            <input name="promptPayId" value="@settings.GetValueOrDefault("PromptPayId")" inputmode="numeric" pattern="0[0-9]{9}" maxlength="10" class="form-control" placeholder="0XXXXXXXXX" />
+            <div class="form-text">รองรับเบอร์มือถือ PromptPay 10 หลัก หากไม่กรอก ระบบจะให้โอนเข้าบัญชีและแนบสลิปตามปกติ</div>
+        </div>
         <button class="btn btn-primary">บันทึก</button>
     </form>
 </div>

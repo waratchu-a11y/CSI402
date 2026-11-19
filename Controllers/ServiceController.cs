@@ -29,6 +29,20 @@ public class ServiceController : Controller
             .OrderByDescending(inspection => inspection.InspectedAt)
             .Take(100)
             .ToList();
+        var returnReviewBookings = _db.Bookings
+            .Where(booking => booking.BookingStatus == "service_review" && booking.CarId.HasValue)
+            .OrderBy(booking => booking.ReturnSubmittedAt)
+            .ToList();
+        var returnReviewBookingIds = returnReviewBookings.Select(booking => booking.BookingId).ToList();
+        ViewBag.ReturnReceivedInspections = _db.CarInspections
+            .Where(inspection => returnReviewBookingIds.Contains(inspection.BookingId) &&
+                inspection.InspectionStage == "return_received")
+            .ToList()
+            .GroupBy(inspection => inspection.BookingId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(inspection => inspection.InspectionId).First());
+        ViewBag.ReturnReviewBookings = returnReviewBookings;
         var eligibleBookings = _db.Bookings
             .Where(booking => booking.BookingStatus == "confirmed" &&
                 booking.CarId.HasValue &&
@@ -185,6 +199,98 @@ public class ServiceController : Controller
         TempData["ServiceMessage"] = readyForRental
             ? $"ตรวจรถก่อนปล่อยเช่า Booking #{bookingId} ผ่านแล้ว"
             : $"ตรวจพบปัญหาใน Booking #{bookingId} ระบบระงับรถและสร้างงานซ่อมแล้ว";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult InspectAfterReturn(
+        int bookingId,
+        bool damageFound,
+        decimal damageAmount,
+        string conditionNotes)
+    {
+        if (!RoleAccess.HasRole(_db, User, "Service", "Admin"))
+        {
+            return Forbid();
+        }
+
+        using var transaction = _db.Database.BeginTransaction();
+        var booking = _db.Bookings
+            .FromSqlInterpolated($"SELECT * FROM bookings WHERE BookingId = {bookingId} FOR UPDATE")
+            .ToList()
+            .FirstOrDefault();
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        if (booking.BookingStatus != "service_review" ||
+            booking.CarId is null ||
+            !booking.ReturnMileage.HasValue ||
+            string.IsNullOrWhiteSpace(booking.ReturnImagePaths))
+        {
+            return Conflict("รายการนี้ยังไม่ผ่านการรับรถจากพนักงาน");
+        }
+
+        var receivedInspection = _db.CarInspections
+            .Where(inspection => inspection.BookingId == bookingId &&
+                inspection.InspectionStage == "return_received")
+            .OrderByDescending(inspection => inspection.InspectionId)
+            .FirstOrDefault();
+        var car = _db.Cars.FirstOrDefault(item => item.CarId == booking.CarId.Value);
+        if (receivedInspection is null || car is null)
+        {
+            return Conflict("ไม่พบข้อมูลรับรถจากพนักงาน");
+        }
+
+        if (damageAmount is < 0 or > 99999999m ||
+            string.IsNullOrWhiteSpace(conditionNotes) ||
+            conditionNotes.Length > 2000 ||
+            (!damageFound && damageAmount > 0))
+        {
+            return BadRequest("กรุณาระบุผลตรวจและค่าซ่อมให้ถูกต้อง");
+        }
+
+        _db.CarInspections.Add(new CarInspectionModel
+        {
+            BookingId = bookingId,
+            CarId = car.CarId,
+            InspectionStage = "after_return",
+            InspectionStatus = damageFound ? "failed" : "passed",
+            Mileage = receivedInspection.Mileage,
+            FuelLevel = receivedInspection.FuelLevel,
+            ConditionNotes = conditionNotes.Trim(),
+            DamageAmount = damageFound ? damageAmount : 0m,
+            InspectedBy = User.Identity?.Name ?? string.Empty,
+            InspectedAt = DateTime.Now
+        });
+        booking.BookingStatus = "completed";
+
+        if (damageFound)
+        {
+            car.Status = "อยู่ระหว่างซ่อม";
+            _db.MaintenanceRecords.Add(new MaintenanceModel
+            {
+                CarId = car.CarId,
+                BookingId = bookingId,
+                IssueDescription = conditionNotes.Trim(),
+                RepairCost = damageAmount,
+                MaintenanceStatus = "reported",
+                ReportedBy = User.Identity?.Name ?? string.Empty,
+                CreatedAt = DateTime.Now
+            });
+        }
+        else
+        {
+            car.Status = "ว่าง";
+        }
+
+        _db.SaveChanges();
+        transaction.Commit();
+        TempData["ServiceMessage"] = damageFound
+            ? $"ตรวจพบความเสียหาย Booking #{bookingId} บันทึกงานซ่อมแล้ว"
+            : $"ตรวจรถคืน Booking #{bookingId} แล้ว ไม่พบความเสียหาย";
         return RedirectToAction(nameof(Index));
     }
 

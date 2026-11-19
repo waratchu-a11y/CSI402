@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using System.Linq;
 using warat_0583_l005.Models;
 using warat_0583_l005.Services;
+using warat_0583_l005.ViewModels;
 
 namespace warat_0583_l005.Controllers
 {
@@ -30,12 +32,139 @@ namespace warat_0583_l005.Controllers
         {
             if (!IsAdmin()) return RedirectToAction("Login", "Account");
 
-            ViewBag.TotalUsers = _db.Set<UserModel>().Count();
-            ViewBag.TotalBookings = _db.Set<BookingModel>().Count();
-            ViewBag.TotalCars = _db.Set<CarModel>().Count();
-            ViewBag.AdminName = User.Identity?.Name ?? "Admin";
+            var bookings = _db.Bookings.ToList();
+            var verifiedRentalPayments = _db.Payments
+                .Where(payment => payment.PaymentType == "rental" && payment.PaymentStatus == "verified")
+                .ToList();
+            var monthStarts = Enumerable.Range(0, 6)
+                .Select(monthOffset => new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(monthOffset - 5))
+                .ToList();
+            DateTime currentMonthStart = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+            DateTime nextMonthStart = currentMonthStart.AddMonths(1);
 
-            return View();
+            var bookingStatusNames = new Dictionary<string, string>
+            {
+                ["pending"] = "รอดำเนินการ",
+                ["pending_payment"] = "รอชำระมัดจำ",
+                ["payment_review"] = "รอตรวจสอบเงิน",
+                ["payment_rejected"] = "ชำระเงินไม่ผ่าน",
+                ["confirmed"] = "ยืนยันแล้ว",
+                ["rented"] = "กำลังเช่า",
+                ["return_requested"] = "รอรับคืนรถ",
+                ["service_review"] = "รอทีมช่างตรวจรถคืน",
+                ["completed"] = "เสร็จสิ้น",
+                ["cancelled"] = "ยกเลิก"
+            };
+            var statusGroups = bookings
+                .GroupBy(booking => booking.BookingStatus)
+                .ToDictionary(group => group.Key, group => group.Count());
+            foreach (string status in statusGroups.Keys.Where(status => !bookingStatusNames.ContainsKey(status)).ToList())
+            {
+                bookingStatusNames[status] = status;
+            }
+
+            var topCars = verifiedRentalPayments
+                .Join(bookings, payment => payment.BookingId, booking => booking.BookingId,
+                    (payment, booking) => new { booking.CarModel, payment.Amount })
+                .GroupBy(item => item.CarModel)
+                .Select(group => new { CarModel = group.Key, Sales = group.Sum(item => item.Amount) })
+                .OrderByDescending(item => item.Sales)
+                .Take(5)
+                .ToList();
+
+            var model = new AdminDashboardViewModel
+            {
+                AdminName = User.Identity?.Name ?? "Admin",
+                TotalUsers = _db.UserModels.Count(),
+                TotalBookings = bookings.Count,
+                TotalCars = _db.Cars.Count(),
+                PendingPayments = _db.Payments.Count(payment =>
+                    (payment.PaymentType == "deposit" || payment.PaymentType == "rental") &&
+                    payment.PaymentStatus == "pending"),
+                TotalSales = verifiedRentalPayments.Sum(payment => payment.Amount),
+                CurrentMonthSales = verifiedRentalPayments
+                    .Where(payment =>
+                    {
+                        DateTime paidAt = payment.ReviewedAt ?? payment.CreatedAt;
+                        return paidAt >= currentMonthStart && paidAt < nextMonthStart;
+                    })
+                    .Sum(payment => payment.Amount),
+                SalesMonthLabels = monthStarts
+                    .Select(month => month.ToString("MMM yyyy", CultureInfo.GetCultureInfo("th-TH")))
+                    .ToList(),
+                MonthlySales = monthStarts
+                    .Select(month => verifiedRentalPayments
+                        .Where(payment =>
+                        {
+                            DateTime paidAt = payment.ReviewedAt ?? payment.CreatedAt;
+                            return paidAt >= month && paidAt < month.AddMonths(1);
+                        })
+                        .Sum(payment => payment.Amount))
+                    .ToList(),
+                TopCarLabels = topCars.Select(item => item.CarModel).ToList(),
+                TopCarSales = topCars.Select(item => item.Sales).ToList(),
+                BookingStatusLabels = bookingStatusNames
+                    .Where(item => statusGroups.ContainsKey(item.Key))
+                    .Select(item => item.Value)
+                    .ToList(),
+                BookingStatusCounts = bookingStatusNames
+                    .Where(item => statusGroups.ContainsKey(item.Key))
+                    .Select(item => statusGroups[item.Key])
+                    .ToList()
+            };
+
+            return View(model);
+        }
+
+        [Authorize]
+        [HttpGet]
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult BookingNotifications(int? afterBookingId)
+        {
+            if (!IsAdmin())
+            {
+                return Forbid();
+            }
+
+            int latestBookingId = _db.Bookings
+                .Select(booking => (int?)booking.BookingId)
+                .Max() ?? 0;
+            int pendingCount = _db.Bookings.Count(booking =>
+                booking.BookingStatus == "pending" ||
+                booking.BookingStatus == "pending_payment" ||
+                booking.BookingStatus == "payment_review" ||
+                booking.BookingStatus == "payment_rejected");
+
+            if (!afterBookingId.HasValue)
+            {
+                return Json(new
+                {
+                    pendingCount,
+                    nextBookingId = latestBookingId,
+                    notifications = Array.Empty<object>()
+                });
+            }
+
+            int cursor = Math.Clamp(afterBookingId.Value, 0, latestBookingId);
+            var newBookings = _db.Bookings
+                .Where(booking => booking.BookingId > cursor)
+                .OrderBy(booking => booking.BookingId)
+                .Take(50)
+                .ToList();
+            var notifications = newBookings.Select(booking => new
+            {
+                id = booking.BookingId,
+                message = $"มีรายการจองใหม่ #{booking.BookingId} จาก {booking.UserId} — {booking.CarModel}",
+                status = booking.BookingStatus,
+                url = Url.Action(nameof(Bookings), new { userId = booking.UserId })
+            });
+
+            return Json(new
+            {
+                pendingCount,
+                nextBookingId = newBookings.Count > 0 ? newBookings[^1].BookingId : cursor,
+                notifications
+            });
         }
 
         // ====================================================
@@ -46,6 +175,7 @@ namespace warat_0583_l005.Controllers
         {
             if (!IsAdmin()) return RedirectToAction("Login", "Account");
 
+            ViewBag.CarLocations = CarLocationOptions.All;
             var cars = _db.Set<CarModel>().ToList();
             return View(cars);
         }
@@ -185,7 +315,9 @@ namespace warat_0583_l005.Controllers
                      item.BookingStatus == "pending_payment" ||
                      item.BookingStatus == "payment_review" ||
                      item.BookingStatus == "confirmed" ||
-                     item.BookingStatus == "rented"))
+                     item.BookingStatus == "rented" ||
+                     item.BookingStatus == "return_requested" ||
+                     item.BookingStatus == "service_review"))
                 .ToList();
             var availabilityCar = new CarModel
             {
@@ -315,6 +447,7 @@ namespace warat_0583_l005.Controllers
         {
             if (!IsAdmin()) return RedirectToAction("Login", "Account");
 
+            string location = car.Location?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(car.CarName) ||
                 car.CarName.Length > 150 ||
                 string.IsNullOrWhiteSpace(car.ImageUrl) ||
@@ -324,7 +457,8 @@ namespace warat_0583_l005.Controllers
                 car.PricePerDay <= 0 ||
                 car.Seats is < 2 or > 12 ||
                 !new[] { "automatic", "manual" }.Contains(car.TransmissionType) ||
-                !new[] { "ว่าง", "ไม่ว่าง", "อยู่ระหว่างซ่อม" }.Contains(car.Status))
+                !new[] { "ว่าง", "ไม่ว่าง", "อยู่ระหว่างซ่อม" }.Contains(car.Status) ||
+                !CarLocationOptions.IsValid(location))
             {
                 TempData["CarError"] = "ข้อมูลรถไม่ถูกต้อง กรุณาตรวจสอบข้อมูลและลองอีกครั้ง";
                 return RedirectToAction("CarManagement");
@@ -333,6 +467,7 @@ namespace warat_0583_l005.Controllers
             car.CarName = car.CarName.Trim();
             car.ImageUrl = car.ImageUrl.Trim();
             car.Details = car.Details.Trim();
+            car.Location = location;
             _db.Set<CarModel>().Add(car);
             _db.SaveChanges();
             return RedirectToAction("CarManagement");
@@ -347,6 +482,7 @@ namespace warat_0583_l005.Controllers
         {
             if (!IsAdmin()) return RedirectToAction("Login", "Account");
 
+            string location = car.Location?.Trim() ?? string.Empty;
             if (car.CarId <= 0 ||
                 string.IsNullOrWhiteSpace(car.CarName) || car.CarName.Length > 150 ||
                 string.IsNullOrWhiteSpace(car.ImageUrl) || car.ImageUrl.Length > 255 ||
@@ -354,7 +490,8 @@ namespace warat_0583_l005.Controllers
                 car.PricePerDay <= 0 ||
                 car.Seats is < 2 or > 12 ||
                 !new[] { "automatic", "manual" }.Contains(car.TransmissionType) ||
-                !new[] { "ว่าง", "ไม่ว่าง", "อยู่ระหว่างซ่อม" }.Contains(car.Status))
+                !new[] { "ว่าง", "ไม่ว่าง", "รอตรวจสภาพ", "อยู่ระหว่างซ่อม" }.Contains(car.Status) ||
+                !CarLocationOptions.IsValid(location))
             {
                 TempData["CarError"] = "ข้อมูลรถไม่ถูกต้อง กรุณาตรวจสอบข้อมูลและลองอีกครั้ง";
                 return RedirectToAction("CarManagement");
@@ -374,6 +511,7 @@ namespace warat_0583_l005.Controllers
             existingCar.Details = car.Details.Trim();
             existingCar.TransmissionType = car.TransmissionType;
             existingCar.Seats = car.Seats;
+            existingCar.Location = location;
             _db.SaveChanges();
 
             TempData["CarSuccess"] = "บันทึกการแก้ไขข้อมูลรถเรียบร้อยแล้ว";

@@ -43,7 +43,7 @@ public class PaymentController : Controller
                 payment.PaymentStatus == "rejected")
             .OrderByDescending(payment => payment.PaymentId)
             .FirstOrDefault();
-        SetBankDetails();
+        SetBankDetails(booking.DepositAmount, booking.BookingId);
         return View(booking);
     }
 
@@ -86,7 +86,7 @@ public class PaymentController : Controller
         }
 
         ViewBag.AmountDue = remainingAmount;
-        SetBankDetails();
+        SetBankDetails(remainingAmount, booking.BookingId);
         return View(booking);
     }
 
@@ -139,7 +139,7 @@ public class PaymentController : Controller
         {
             ModelState.AddModelError(nameof(proofFile), "กรุณาแนบสลิปโอนเงิน JPG หรือ PNG ขนาดไม่เกิน 5 MB");
             ViewBag.AmountDue = amountDue;
-            SetBankDetails();
+            SetBankDetails(amountDue, booking.BookingId);
             return View(booking);
         }
 
@@ -194,7 +194,7 @@ public class PaymentController : Controller
         {
             ModelState.AddModelError(nameof(proofFile), "กรุณาแนบสลิปโอนเงิน JPG หรือ PNG ขนาดไม่เกิน 5 MB");
             ViewBag.Booking = booking;
-            SetBankDetails();
+            SetBankDetails(booking.DepositAmount, booking.BookingId);
             return View(booking);
         }
 
@@ -466,6 +466,39 @@ public class PaymentController : Controller
         return stream is null ? NotFound() : File(stream, contentType);
     }
 
+    [HttpGet]
+    public IActionResult ReturnPhoto(int bookingId, int imageIndex)
+    {
+        var booking = _db.Bookings.FirstOrDefault(item => item.BookingId == bookingId);
+        if (booking?.ReturnImagePaths is null)
+        {
+            return NotFound();
+        }
+
+        bool isOwner = booking.UserId == User.Identity?.Name;
+        bool isStaff = RoleAccess.HasRole(_db, User, "Employee", "Service", "Admin", "Manager");
+        if (!isOwner && !isStaff)
+        {
+            return Forbid();
+        }
+
+        string[] imagePaths = booking.ReturnImagePaths.Split('|', StringSplitOptions.RemoveEmptyEntries);
+        if (imageIndex < 0 || imageIndex >= imagePaths.Length)
+        {
+            return NotFound();
+        }
+
+        string imagePath = imagePaths[imageIndex];
+        string? contentType = PrivateUploadStorage.GetImageContentType(imagePath);
+        if (contentType is null)
+        {
+            return NotFound();
+        }
+
+        var stream = _uploadStorage.OpenRead(imagePath);
+        return stream is null ? NotFound() : File(stream, contentType);
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public IActionResult CompleteRefund(int bookingId, string? transferReference)
@@ -505,8 +538,8 @@ public class PaymentController : Controller
         var maintenanceItems = _db.MaintenanceRecords
             .Where(item => item.BookingId == bookingId)
             .ToList();
-        if (returnInspection.DamageAmount > 0 &&
-            (maintenanceItems.Count == 0 || maintenanceItems.Any(item => item.MaintenanceStatus != "completed")))
+        if ((returnInspection.DamageAmount > 0 && maintenanceItems.Count == 0) ||
+            maintenanceItems.Any(item => item.MaintenanceStatus != "completed"))
         {
             return Conflict("ต้องให้ทีมเซอร์วิสสรุปค่าซ่อมและปิดงานก่อนคืนมัดจำ");
         }
@@ -570,12 +603,16 @@ public class PaymentController : Controller
             booking.BookingId == bookingId &&
             booking.UserId == User.Identity!.Name);
 
-    private void SetBankDetails()
+    private void SetBankDetails(decimal amount, int bookingId)
     {
         var settings = _db.SystemSettings.ToDictionary(setting => setting.SettingKey, setting => setting.SettingValue);
         ViewBag.BankName = settings.GetValueOrDefault("BankName");
         ViewBag.BankAccount = settings.GetValueOrDefault("BankAccount");
         ViewBag.BankAccountName = settings.GetValueOrDefault("BankAccountName");
+        string? promptPayId = settings.GetValueOrDefault("PromptPayId");
+        ViewBag.PromptPayQr = PromptPayQrCode.IsValidMobileNumber(promptPayId)
+            ? PromptPayQrCode.CreatePngDataUri(promptPayId!, amount, $"BK{bookingId:D8}")
+            : null;
     }
 
     private bool IsBankConfigured() =>

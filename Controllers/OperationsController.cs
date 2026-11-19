@@ -25,7 +25,10 @@ public class OperationsController : Controller
         }
 
         var bookings = _db.Bookings
-            .Where(booking => booking.BookingStatus == "confirmed" || booking.BookingStatus == "rented")
+            .Where(booking =>
+                booking.BookingStatus == "confirmed" ||
+                booking.BookingStatus == "rented" ||
+                booking.BookingStatus == "return_requested")
             .OrderBy(booking => booking.PickupDate)
             .ToList();
         ViewBag.LatestInspections = _db.CarInspections
@@ -168,14 +171,18 @@ public class OperationsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult Return(int bookingId, int mileage, int fuelLevel, decimal damageAmount, string? conditionNotes)
+    public IActionResult ReceiveReturn(int bookingId, int mileage, int fuelLevel, string? conditionNotes)
     {
         if (!RoleAccess.HasRole(_db, User, "Employee", "Admin"))
         {
             return Forbid();
         }
 
-        var booking = _db.Bookings.FirstOrDefault(item => item.BookingId == bookingId);
+        using var transaction = _db.Database.BeginTransaction();
+        var booking = _db.Bookings
+            .FromSqlInterpolated($"SELECT * FROM bookings WHERE BookingId = {bookingId} FOR UPDATE")
+            .ToList()
+            .FirstOrDefault();
         if (booking is null)
         {
             return NotFound();
@@ -185,16 +192,21 @@ public class OperationsController : Controller
             .Where(inspection => inspection.BookingId == bookingId && inspection.InspectionStage == "before_pickup")
             .OrderByDescending(inspection => inspection.InspectionId)
             .FirstOrDefault();
-        if (booking.BookingStatus != "rented" || booking.CarId is null || pickupInspection is null)
+        if (booking.BookingStatus != "return_requested" ||
+            booking.CarId is null ||
+            pickupInspection is null ||
+            !booking.ReturnMileage.HasValue ||
+            string.IsNullOrWhiteSpace(booking.ReturnImagePaths))
         {
-            return Conflict("ไม่พบการส่งมอบรถที่ยังรอรับคืน");
+            return Conflict("ต้องให้ลูกค้าส่งรูปและเลขไมล์ก่อนจึงรับคืนรถได้");
         }
 
-        if (mileage < pickupInspection.Mileage || fuelLevel is < 0 or > 100 ||
-            damageAmount < 0 || damageAmount > 99999999m ||
+        if (mileage < booking.ReturnMileage.Value ||
+            mileage < pickupInspection.Mileage ||
+            fuelLevel is < 0 or > 100 ||
             conditionNotes?.Length > 2000)
         {
-            return BadRequest("ข้อมูลคืนรถไม่ถูกต้อง เลขไมล์และค่าความเสียหายต้องอยู่ในช่วงที่กำหนด");
+            return BadRequest("ข้อมูลรับคืนไม่ถูกต้อง เลขไมล์ที่พนักงานตรวจต้องไม่น้อยกว่าที่ลูกค้าแจ้งและเลขไมล์ตอนส่งมอบ");
         }
 
         var car = _db.Cars.FirstOrDefault(item => item.CarId == booking.CarId);
@@ -207,34 +219,19 @@ public class OperationsController : Controller
         {
             BookingId = bookingId,
             CarId = car.CarId,
-            InspectionStage = "after_return",
+            InspectionStage = "return_received",
             Mileage = mileage,
             FuelLevel = fuelLevel,
             ConditionNotes = conditionNotes?.Trim(),
-            DamageAmount = damageAmount,
             InspectedBy = User.Identity?.Name ?? string.Empty,
             InspectedAt = DateTime.Now
         });
-        booking.BookingStatus = "completed";
-        car.Status = damageAmount > 0 ? "อยู่ระหว่างซ่อม" : "ว่าง";
-        if (damageAmount > 0)
-        {
-            _db.MaintenanceRecords.Add(new MaintenanceModel
-            {
-                CarId = car.CarId,
-                BookingId = bookingId,
-                IssueDescription = conditionNotes?.Trim() is { Length: > 0 } notes
-                    ? notes
-                    : "ความเสียหายจากการตรวจรับคืนรถ",
-                RepairCost = damageAmount,
-                MaintenanceStatus = "reported",
-                ReportedBy = User.Identity?.Name ?? string.Empty,
-                CreatedAt = DateTime.Now
-            });
-        }
+        booking.BookingStatus = "service_review";
+        car.Status = "รอตรวจสภาพ";
 
         _db.SaveChanges();
-        TempData["OperationsMessage"] = "รับคืนรถและบันทึกผลตรวจสภาพแล้ว ฝ่ายการเงินสามารถดำเนินการคืนมัดจำ";
+        transaction.Commit();
+        TempData["OperationsMessage"] = "บันทึกรับรถแล้ว ส่งต่อให้ทีมเซอร์วิสตรวจความเสียหาย";
         return RedirectToAction(nameof(Index));
     }
 }

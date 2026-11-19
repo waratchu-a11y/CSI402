@@ -116,6 +116,9 @@ public Csi402dbContext(DbContextOptions<Csi402dbContext> options)
             entity.Property(e => e.LicenseImagePath).HasMaxLength(255);
             entity.Property(e => e.LicenseStatus).HasMaxLength(30).HasDefaultValue("pending");
             entity.Property(e => e.LicenseReviewNote).HasMaxLength(500);
+            entity.Property(e => e.ReturnMileage);
+            entity.Property(e => e.ReturnImagePaths).HasMaxLength(500);
+            entity.Property(e => e.ReturnSubmittedAt).HasColumnType("datetime");
             entity.HasIndex(e => e.CarId);
             entity.HasOne<CarModel>().WithMany().HasForeignKey(e => e.CarId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -135,6 +138,7 @@ public Csi402dbContext(DbContextOptions<Csi402dbContext> options)
             entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("ว่าง");
             entity.Property(e => e.Details).HasMaxLength(255).IsRequired();
             entity.Property(e => e.TransmissionType).HasMaxLength(20);
+            entity.Property(e => e.Location).HasMaxLength(150);
         });
 
         modelBuilder.Entity<PaymentModel>(entity =>

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Globalization;
 using warat_0583_l005.Models;
@@ -11,6 +12,7 @@ public class ManagementController : Controller
 {
     private static readonly string[] AvailableRoles = ["Customer", "Employee", "Manager", "Finance", "Service", "Admin"];
     private readonly Csi402dbContext _db;
+    private readonly PasswordHasher<UserModel> _passwordHasher = new();
 
     public ManagementController(Csi402dbContext db)
     {
@@ -30,7 +32,10 @@ public class ManagementController : Controller
         ViewBag.CarCount = _db.Cars.Count();
         ViewBag.BookingCount = _db.Bookings.Count();
         ViewBag.ActiveBookingCount = _db.Bookings.Count(booking =>
-            booking.BookingStatus == "confirmed" || booking.BookingStatus == "rented");
+            booking.BookingStatus == "confirmed" ||
+            booking.BookingStatus == "rented" ||
+            booking.BookingStatus == "return_requested" ||
+            booking.BookingStatus == "service_review");
         ViewBag.UserCount = _db.UserModels.Count();
         ViewBag.NetReceived = payments.Sum(payment =>
             payment.PaymentType == "refund" ? -payment.Amount :
@@ -75,14 +80,17 @@ public class ManagementController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveBankSettings(string bankName, string bankAccount, string bankAccountName)
+    public IActionResult SaveBankSettings(string bankName, string bankAccount, string bankAccountName, string? promptPayId)
     {
         if (!RoleAccess.HasRole(_db, User, "Admin"))
         {
             return Forbid();
         }
 
-        if (bankName?.Length > 100 || bankAccount?.Length > 100 || bankAccountName?.Length > 150)
+        if (bankName?.Length > 100 ||
+            bankAccount?.Length > 100 ||
+            bankAccountName?.Length > 150 ||
+            (!string.IsNullOrWhiteSpace(promptPayId) && !PromptPayQrCode.IsValidMobileNumber(promptPayId.Trim())))
         {
             return BadRequest("ข้อมูลบัญชีรับโอนไม่ถูกต้อง");
         }
@@ -90,6 +98,7 @@ public class ManagementController : Controller
         SetSetting("BankName", bankName?.Trim() ?? string.Empty);
         SetSetting("BankAccount", bankAccount?.Trim() ?? string.Empty);
         SetSetting("BankAccountName", bankAccountName?.Trim() ?? string.Empty);
+        SetSetting("PromptPayId", promptPayId?.Trim() ?? string.Empty);
         _db.SaveChanges();
         TempData["ManagementMessage"] = "บันทึกข้อมูลบัญชีรับโอนแล้ว";
         return RedirectToAction(nameof(Settings));
@@ -292,6 +301,42 @@ public class ManagementController : Controller
         user.IsActive = isActive;
         _db.SaveChanges();
         TempData["ManagementMessage"] = "อัปเดตสิทธิ์ผู้ใช้งานแล้ว";
+        return RedirectToAction(nameof(Users));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult ResetUserPassword(int userId, string newPassword, string confirmPassword)
+    {
+        bool isAdmin = RoleAccess.HasRole(_db, User, "Admin");
+        if (!isAdmin && !RoleAccess.HasRole(_db, User, "Manager"))
+        {
+            return Forbid();
+        }
+
+        var target = _db.UserModels.FirstOrDefault(item => item.Id == userId);
+        if (target is null)
+        {
+            return NotFound();
+        }
+
+        if (!isAdmin && (target.Role is "Admin" or "Manager"))
+        {
+            return Forbid();
+        }
+
+        if (string.IsNullOrWhiteSpace(newPassword) ||
+            newPassword.Length < 8 ||
+            newPassword.Length > 128 ||
+            newPassword != confirmPassword)
+        {
+            TempData["ManagementError"] = "ตั้งรหัสผ่านไม่สำเร็จ: รหัสผ่านต้องมี 8–128 ตัวอักษรและต้องกรอกให้ตรงกัน";
+            return RedirectToAction(nameof(Users));
+        }
+
+        target.Password = _passwordHasher.HashPassword(target, newPassword);
+        _db.SaveChanges();
+        TempData["ManagementMessage"] = $"ตั้งรหัสผ่านใหม่ให้ผู้ใช้ {target.Username} แล้ว กรุณาแจ้งรหัสใหม่นี้แก่เจ้าของบัญชี";
         return RedirectToAction(nameof(Users));
     }
 

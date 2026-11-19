@@ -79,5 +79,14 @@ namespace warat_0583_l005.Models
 
         [Column("LicenseReviewNote")]
         public string? LicenseReviewNote { get; set; }
+
+        [Column("ReturnMileage")]
+        public int? ReturnMileage { get; set; }
+
+        [Column("ReturnImagePaths")]
+        public string? ReturnImagePaths { get; set; }
+
+        [Column("ReturnSubmittedAt")]
+        public DateTime? ReturnSubmittedAt { get; set; }
     }
 }

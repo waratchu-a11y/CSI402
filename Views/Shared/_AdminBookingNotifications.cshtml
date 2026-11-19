@@ -1,0 +1,107 @@
+<div id="adminBookingNotificationToasts"
+     class="toast-container position-fixed bottom-0 end-0 p-3"
+     aria-live="polite"
+     aria-atomic="true"
+     style="z-index: 1090;"></div>
+
+<script>
+    (() => {
+        const endpoint = '@Url.Action("BookingNotifications", "Admin")';
+        const badge = document.getElementById('adminBookingNotificationBadge');
+        const toastContainer = document.getElementById('adminBookingNotificationToasts');
+        const cursorKey = `driverRentAdminBookings:${document.body.dataset.adminNotificationUser}`;
+        let cursor = null;
+        let isChecking = false;
+
+        try {
+            const storedCursor = localStorage.getItem(cursorKey);
+            if (storedCursor !== null && Number.isSafeInteger(Number(storedCursor)) && Number(storedCursor) >= 0) {
+                cursor = Number(storedCursor);
+            }
+        } catch (error) {
+            console.warn('Could not restore the admin booking notification cursor.', error);
+        }
+
+        function saveCursor(value) {
+            cursor = value;
+            try {
+                localStorage.setItem(cursorKey, String(value));
+            } catch (error) {
+                console.warn('Could not save the admin booking notification cursor.', error);
+            }
+        }
+
+        function showNotification(notification) {
+            const toastElement = document.createElement('div');
+            toastElement.className = 'toast text-bg-primary border-0 shadow';
+            toastElement.setAttribute('role', 'alert');
+            toastElement.setAttribute('aria-live', 'assertive');
+            toastElement.setAttribute('aria-atomic', 'true');
+
+            const header = document.createElement('div');
+            header.className = 'toast-header';
+            const title = document.createElement('strong');
+            title.className = 'me-auto';
+            title.textContent = 'มีรายการจองใหม่';
+            const closeButton = document.createElement('button');
+            closeButton.type = 'button';
+            closeButton.className = 'btn-close';
+            closeButton.setAttribute('data-bs-dismiss', 'toast');
+            closeButton.setAttribute('aria-label', 'ปิด');
+            header.append(title, closeButton);
+
+            const body = document.createElement('div');
+            body.className = 'toast-body';
+            const message = document.createElement('div');
+            message.textContent = notification.message;
+            const link = document.createElement('a');
+            link.href = notification.url || '/Admin/Bookings';
+            link.className = 'btn btn-sm btn-light mt-2';
+            link.textContent = 'เปิดรายการจอง';
+            body.append(message, link);
+
+            toastElement.append(header, body);
+            toastContainer.append(toastElement);
+            toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove(), { once: true });
+            new bootstrap.Toast(toastElement, { delay: 12000 }).show();
+        }
+
+        async function checkNotifications() {
+            if (isChecking) return;
+            isChecking = true;
+            try {
+                const requestUrl = new URL(endpoint, window.location.origin);
+                if (cursor !== null) {
+                    requestUrl.searchParams.set('afterBookingId', cursor);
+                }
+
+                const response = await fetch(requestUrl, {
+                    cache: 'no-store',
+                    credentials: 'same-origin'
+                });
+                if (!response.ok) {
+                    throw new Error(`Admin booking notification check failed with HTTP ${response.status}.`);
+                }
+
+                const state = await response.json();
+                for (const notification of state.notifications) {
+                    showNotification(notification);
+                }
+                saveCursor(state.nextBookingId);
+
+                if (badge) {
+                    badge.textContent = state.pendingCount;
+                    badge.classList.toggle('d-none', state.pendingCount === 0);
+                    badge.setAttribute('aria-label', `มี ${state.pendingCount} รายการจองที่รอดำเนินการ`);
+                }
+            } catch (error) {
+                console.error('Unable to check admin booking notifications.', error);
+            } finally {
+                isChecking = false;
+            }
+        }
+
+        checkNotifications();
+        window.setInterval(checkNotifications, 15000);
+    })();
+</script>

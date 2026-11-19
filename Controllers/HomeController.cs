@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using warat_0583_l005.Models;
 using warat_0583_l005.Services;
 using System.Linq;
@@ -12,10 +13,12 @@ namespace warat_0583_l005.Controllers;
 public class HomeController : Controller
 {
     private readonly Csi402dbContext _db;
+    private readonly PrivateUploadStorage _uploadStorage;
 
-    public HomeController(Csi402dbContext db)
+    public HomeController(Csi402dbContext db, PrivateUploadStorage uploadStorage)
     {
         _db = db;
+        _uploadStorage = uploadStorage;
     }
 
     public IActionResult Index()
@@ -24,6 +27,8 @@ public class HomeController : Controller
             .OrderByDescending(car => car.CarId)
             .Take(3)
             .ToList();
+        SetUnavailableCars(cars, DateTime.Today, DateTime.Today.AddDays(1));
+        ViewBag.CarLocations = CarLocationOptions.All;
         ViewBag.ActivePromotions = GetAdvertisedPromotions();
         return View("Indexcustomer", cars);
     }
@@ -34,6 +39,8 @@ public class HomeController : Controller
             .OrderByDescending(car => car.CarId)
             .Take(3)
             .ToList();
+        SetUnavailableCars(cars, DateTime.Today, DateTime.Today.AddDays(1));
+        ViewBag.CarLocations = CarLocationOptions.All;
         ViewBag.ActivePromotions = GetAdvertisedPromotions();
         return View(cars);
     }
@@ -44,6 +51,8 @@ public class HomeController : Controller
         var cars = _db.Set<CarModel>()
             .OrderByDescending(car => car.CarId)
             .ToList();
+        SetUnavailableCars(cars, DateTime.Today, DateTime.Today.AddDays(1));
+        ViewBag.CarLocations = CarLocationOptions.All;
         return View(cars);
     }
 
@@ -137,6 +146,8 @@ public class HomeController : Controller
             return RedirectToAction("Indexcustomer"); 
         }
 
+        SetUnavailableCars([car], DateTime.Today, DateTime.Today.AddDays(1));
+        ViewBag.CarLocations = CarLocationOptions.All;
         ViewBag.CarName = car.CarName; 
         return View(car);
     }
@@ -170,6 +181,209 @@ public class HomeController : Controller
 
         ViewBag.Username = User.Identity?.Name;
         return View();
+    }
+
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RequestReturn(int id, int mileage, IFormFile[]? returnImages)
+    {
+        if (!RoleAccess.HasRole(_db, User, "Customer"))
+        {
+            return Forbid();
+        }
+
+        var booking = _db.Bookings.FirstOrDefault(item =>
+            item.BookingId == id && item.UserId == User.Identity!.Name);
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        if (booking.BookingStatus != "rented")
+        {
+            return Conflict("แจ้งคืนรถได้เฉพาะรายการที่กำลังเช่า");
+        }
+
+        var pickupInspection = _db.CarInspections
+            .Where(inspection => inspection.BookingId == id &&
+                inspection.InspectionStage == "before_pickup")
+            .OrderByDescending(inspection => inspection.InspectionId)
+            .FirstOrDefault();
+        if (pickupInspection is null || mileage < pickupInspection.Mileage)
+        {
+            TempData["PaymentMessage"] = "เลขไมล์คืนรถต้องไม่น้อยกว่าเลขไมล์ตอนรับรถ";
+            return RedirectToAction(nameof(MyBookings));
+        }
+
+        var car = booking.CarId.HasValue
+            ? _db.Cars.FirstOrDefault(item => item.CarId == booking.CarId.Value)
+            : null;
+        if (car is null)
+        {
+            return NotFound("ไม่พบข้อมูลรถที่จอง");
+        }
+
+        var images = returnImages?.Where(image => image.Length > 0).ToList() ?? [];
+        if (images.Count is < 1 or > 5 || images.Any(image => image.Length > 5 * 1024 * 1024))
+        {
+            TempData["PaymentMessage"] = "กรุณาแนบรูปรถ 1-5 รูป โดยแต่ละรูปมีขนาดไม่เกิน 5 MB";
+            return RedirectToAction(nameof(MyBookings));
+        }
+
+        var savedImagePaths = new List<string>(images.Count);
+        foreach (var image in images)
+        {
+            string? savedImagePath = await _uploadStorage.SaveImageAsync(image, HttpContext.RequestAborted);
+            if (savedImagePath is null)
+            {
+                foreach (string savedPath in savedImagePaths)
+                {
+                    _uploadStorage.Delete(savedPath);
+                }
+
+                TempData["PaymentMessage"] = "รูปภาพไม่ถูกต้อง กรุณาใช้ไฟล์ JPG หรือ PNG";
+                return RedirectToAction(nameof(MyBookings));
+            }
+
+            savedImagePaths.Add(savedImagePath);
+        }
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(HttpContext.RequestAborted);
+        var currentBooking = await _db.Bookings
+            .FromSqlInterpolated($"SELECT * FROM bookings WHERE BookingId = {id} FOR UPDATE")
+            .AsNoTracking()
+            .FirstOrDefaultAsync(HttpContext.RequestAborted);
+        if (currentBooking?.BookingStatus != "rented")
+        {
+            foreach (string savedPath in savedImagePaths)
+            {
+                _uploadStorage.Delete(savedPath);
+            }
+
+            TempData["PaymentMessage"] = "สถานะรายการจองเปลี่ยนไปแล้ว กรุณาตรวจสอบรายการอีกครั้ง";
+            return RedirectToAction(nameof(MyBookings));
+        }
+
+        booking.ReturnMileage = mileage;
+        booking.ReturnImagePaths = string.Join('|', savedImagePaths);
+        booking.ReturnSubmittedAt = DateTime.Now;
+        booking.BookingStatus = "return_requested";
+        car.Status = "รอตรวจสภาพ";
+        await _db.SaveChangesAsync(HttpContext.RequestAborted);
+        await transaction.CommitAsync(HttpContext.RequestAborted);
+        TempData["PaymentMessage"] = $"ส่งข้อมูลคืนรถ Booking #{booking.BookingId} แล้ว กรุณานำรถส่งมอบให้พนักงานตรวจรับ";
+        return RedirectToAction(nameof(MyBookings));
+    }
+
+    [HttpGet]
+    [Authorize]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult CustomerNotifications()
+    {
+        if (!RoleAccess.HasRole(_db, User, "Customer"))
+        {
+            return Forbid();
+        }
+
+        var bookings = _db.Bookings
+            .Where(booking => booking.UserId == User.Identity!.Name &&
+                (booking.BookingStatus == "pending_payment" ||
+                 booking.BookingStatus == "payment_rejected" ||
+                 booking.BookingStatus == "payment_review" ||
+                 booking.BookingStatus == "confirmed"))
+            .ToList();
+        var bookingIds = bookings.Select(booking => booking.BookingId).ToList();
+        var paymentsByBooking = _db.Payments
+            .Where(payment => bookingIds.Contains(payment.BookingId))
+            .ToList()
+            .ToLookup(payment => payment.BookingId);
+
+        var notifications = new List<object>();
+        int count = 0;
+        foreach (var booking in bookings)
+        {
+            var payments = paymentsByBooking[booking.BookingId];
+            string type;
+            string message;
+            decimal amount = 0m;
+
+            if (booking.BookingStatus == "pending_payment")
+            {
+                type = "deposit-needed";
+                amount = booking.DepositAmount;
+                message = $"กรุณาชำระเงินมัดจำ ฿{amount:N2} สำหรับการจอง #{booking.BookingId}";
+            }
+            else if (booking.BookingStatus == "payment_rejected")
+            {
+                type = "deposit-rejected";
+                var rejectedDeposit = payments
+                    .Where(payment => payment.PaymentType == "deposit" && payment.PaymentStatus == "rejected")
+                    .OrderByDescending(payment => payment.PaymentId)
+                    .FirstOrDefault();
+                message = $"ฝ่ายการเงินปฏิเสธสลิปมัดจำของการจอง #{booking.BookingId}" +
+                    (string.IsNullOrWhiteSpace(rejectedDeposit?.Note) ? " กรุณาตรวจสอบและส่งหลักฐานใหม่" : $": {rejectedDeposit.Note}");
+            }
+            else if (booking.BookingStatus == "payment_review")
+            {
+                type = "deposit-review";
+                message = $"ได้รับสลิปมัดจำของการจอง #{booking.BookingId} แล้ว กำลังตรวจสอบโดยฝ่ายการเงิน";
+            }
+            else
+            {
+                var pendingRental = payments
+                    .Where(payment => payment.PaymentType == "rental" && payment.PaymentStatus == "pending")
+                    .OrderByDescending(payment => payment.PaymentId)
+                    .FirstOrDefault();
+                var rejectedRental = payments
+                    .Where(payment => payment.PaymentType == "rental" && payment.PaymentStatus == "rejected")
+                    .OrderByDescending(payment => payment.PaymentId)
+                    .FirstOrDefault();
+                decimal rentalPaid = payments
+                    .Where(payment => payment.PaymentType == "rental" && payment.PaymentStatus == "verified")
+                    .Sum(payment => payment.Amount);
+                amount = Math.Max(0m, booking.TotalPrice - rentalPaid);
+
+                if (pendingRental is not null)
+                {
+                    type = $"rental-review-{pendingRental.PaymentId}";
+                    message = $"ได้รับสลิปค่าเช่าของการจอง #{booking.BookingId} แล้ว กำลังตรวจสอบโดยฝ่ายการเงิน";
+                }
+                else if (rejectedRental is not null)
+                {
+                    type = $"rental-rejected-{rejectedRental.PaymentId}";
+                    message = $"ฝ่ายการเงินปฏิเสธสลิปค่าเช่าของการจอง #{booking.BookingId}" +
+                        (string.IsNullOrWhiteSpace(rejectedRental.Note) ? " กรุณาตรวจสอบและส่งหลักฐานใหม่" : $": {rejectedRental.Note}");
+                }
+                else if (amount > 0m)
+                {
+                    type = "rental-payment-needed";
+                    message = $"ฝ่ายการเงินยืนยันมัดจำแล้ว กรุณาชำระค่าเช่า ฿{amount:N2} (ไม่รวมเงินมัดจำ) สำหรับการจอง #{booking.BookingId}";
+                }
+                else
+                {
+                    type = "rental-paid";
+                    message = $"ฝ่ายการเงินยืนยันการชำระค่าเช่าครบแล้ว สำหรับการจอง #{booking.BookingId}";
+                }
+            }
+
+            if (type != "rental-paid")
+            {
+                count++;
+            }
+
+            notifications.Add(new
+            {
+                id = $"{booking.BookingId}:{type}",
+                bookingId = booking.BookingId,
+                type,
+                message,
+                amount,
+                url = Url.Action(nameof(MyBookings), "Home")
+            });
+        }
+
+        return Json(new { count, notifications });
     }
 
     [HttpGet]
@@ -219,6 +433,13 @@ public class HomeController : Controller
         ViewBag.SearchLocation = pickupLocation;
         ViewBag.SearchPickupDate = pickupDate;
         ViewBag.SearchReturnDate = returnDate;
+        ViewBag.CarLocations = CarLocationOptions.All;
+
+        if (!CarLocationOptions.IsValid(pickupLocation))
+        {
+            ViewBag.SearchError = "กรุณาเลือกสถานที่รับรถที่ถูกต้อง";
+            return View("AllCars", new List<CarModel>());
+        }
 
         if (!CarAvailability.TryParseDate(pickupDate, out DateTime parsedPickupDate) ||
             !CarAvailability.TryParseDate(returnDate, out DateTime parsedReturnDate) ||
@@ -237,26 +458,33 @@ public class HomeController : Controller
         ViewBag.SearchReturnDate = returnDate;
         ViewBag.SearchRentalDays = rentalDays;
 
+        var cars = _db.Set<CarModel>()
+            .Where(car => car.Location == pickupLocation)
+            .ToList()
+            .OrderByDescending(car => car.CarId)
+            .ToList();
+        SetUnavailableCars(cars, parsedPickupDate, parsedReturnDate);
+
+        return View("AllCars", cars);
+    }
+
+    private void SetUnavailableCars(IEnumerable<CarModel> cars, DateTime pickupDate, DateTime returnDate)
+    {
         var activeBookings = _db.Bookings
             .Where(booking =>
                 booking.BookingStatus == "pending" ||
                 booking.BookingStatus == "pending_payment" ||
                 booking.BookingStatus == "payment_review" ||
                 booking.BookingStatus == "confirmed" ||
-                booking.BookingStatus == "rented")
+                booking.BookingStatus == "rented" ||
+                booking.BookingStatus == "return_requested" ||
+                booking.BookingStatus == "service_review")
             .ToList();
 
-        var searchResults = _db.Set<CarModel>()
-            .ToList()
-            .Where(car => CarAvailability.IsAvailable(
-                car,
-                activeBookings,
-                parsedPickupDate,
-                parsedReturnDate))
-            .OrderByDescending(car => car.CarId)
-            .ToList();
-
-        return View("AllCars", searchResults);
+        ViewBag.UnavailableCarIds = cars
+            .Where(car => !CarAvailability.IsAvailable(car, activeBookings, pickupDate, returnDate))
+            .Select(car => car.CarId)
+            .ToHashSet();
     }
 
     private List<PromotionModel> GetAdvertisedPromotions()

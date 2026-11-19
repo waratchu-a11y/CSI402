@@ -10,6 +10,11 @@
                         .Where(b => b.UserId == currentUsername)
                         .OrderByDescending(b => b.BookingId)
                         .ToList();
+    var bookingIds = myBookings.Select(booking => booking.BookingId).ToList();
+    var paymentsByBooking = _db.Payments
+        .Where(payment => bookingIds.Contains(payment.BookingId))
+        .ToList()
+        .ToLookup(payment => payment.BookingId);
 }
 
 <div class="bg-primary text-white py-4 shadow-sm mb-5" style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
@@ -47,6 +52,21 @@
                         {
                             @foreach (var item in myBookings)
                             {
+                                var bookingPayments = paymentsByBooking[item.BookingId];
+                                var rentalPaid = bookingPayments
+                                    .Where(payment => payment.PaymentType == "rental" && payment.PaymentStatus == "verified")
+                                    .Sum(payment => payment.Amount);
+                                var rentalRemaining = Math.Max(0m, item.TotalPrice - rentalPaid);
+                                var pendingRentalPayment = bookingPayments.Any(payment =>
+                                    payment.PaymentType == "rental" && payment.PaymentStatus == "pending");
+                                var rejectedRentalPayment = bookingPayments
+                                    .Where(payment => payment.PaymentType == "rental" && payment.PaymentStatus == "rejected")
+                                    .OrderByDescending(payment => payment.PaymentId)
+                                    .FirstOrDefault();
+                                var rejectedDepositPayment = bookingPayments
+                                    .Where(payment => payment.PaymentType == "deposit" && payment.PaymentStatus == "rejected")
+                                    .OrderByDescending(payment => payment.PaymentId)
+                                    .FirstOrDefault();
                                 <tr>
                                     <td class="py-3 px-4 fw-bold text-dark">
                                         <div class="d-flex align-items-center">
@@ -62,21 +82,69 @@
                                     <td>@item.RentalDays วัน</td>
                                     <td class="fw-bold text-primary">฿@item.TotalPrice.ToString("N0")</td>
                                     <td class="text-center">
-                                        @if (item.BookingStatus is "pending_payment" or "payment_rejected")
+                                        @if (item.BookingStatus == "pending_payment")
                                         {
                                             <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">รอชำระมัดจำ</span>
+                                        }
+                                        else if (item.BookingStatus == "payment_rejected")
+                                        {
+                                            <span class="badge bg-danger px-3 py-2 rounded-pill">มัดจำถูกปฏิเสธ</span>
+                                            <span class="d-block small text-danger mt-1">@(rejectedDepositPayment?.Note ?? "กรุณาส่งหลักฐานมัดจำใหม่")</span>
                                         }
                                         else if (item.BookingStatus == "payment_review")
                                         {
                                             <span class="badge bg-info text-dark px-3 py-2 rounded-pill">รอตรวจสอบสลิป</span>
+                                            <div class="alert alert-info py-2 px-3 mt-2 mb-0 small text-start">
+                                                <i class="fa-solid fa-hourglass-half me-1"></i>
+                                                ได้รับหลักฐานมัดจำแล้ว กำลังตรวจสอบโดยฝ่ายการเงิน
+                                            </div>
                                         }
                                         else if (item.BookingStatus == "confirmed")
                                         {
                                             <span class="badge bg-success px-3 py-2 rounded-pill">ยืนยันแล้ว</span>
+                                            @if (pendingRentalPayment)
+                                            {
+                                                <div class="alert alert-info py-2 px-3 mt-2 mb-0 small text-start">
+                                                    <i class="fa-solid fa-hourglass-half me-1"></i>
+                                                    กำลังตรวจสอบหลักฐานชำระค่าเช่าโดยฝ่ายการเงิน
+                                                </div>
+                                            }
+                                            else if (rejectedRentalPayment is not null)
+                                            {
+                                                <div class="alert alert-warning py-2 px-3 mt-2 mb-0 small text-start">
+                                                    <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                                                    หลักฐานค่าเช่าถูกปฏิเสธ: @(rejectedRentalPayment.Note ?? "กรุณาตรวจสอบและส่งใหม่")
+                                                </div>
+                                            }
+                                            else if (rentalRemaining > 0)
+                                            {
+                                                <div class="alert alert-success py-2 px-3 mt-2 mb-0 small text-start">
+                                                    <i class="fa-solid fa-circle-check me-1"></i>
+                                                    ฝ่ายการเงินยืนยันมัดจำแล้ว กรุณาชำระค่าเช่าคงเหลือ ฿@rentalRemaining.ToString("N2")
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="alert alert-success py-2 px-3 mt-2 mb-0 small text-start">
+                                                    <i class="fa-solid fa-circle-check me-1"></i> ชำระค่าเช่าครบแล้ว
+                                                </div>
+                                            }
                                         }
                                         else if (item.BookingStatus == "rented")
                                         {
                                             <span class="badge bg-primary px-3 py-2 rounded-pill">กำลังเช่า</span>
+                                        }
+                                        else if (item.BookingStatus == "return_requested")
+                                        {
+                                            <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">รอพนักงานตรวจรับคืน</span>
+                                            <div class="alert alert-info py-2 px-3 mt-2 mb-0 small text-start">
+                                                <i class="fa-solid fa-hourglass-half me-1"></i>
+                                                ส่งข้อมูลแล้ว กรุณานำรถส่งมอบให้พนักงานตรวจรับ
+                                            </div>
+                                        }
+                                        else if (item.BookingStatus == "service_review")
+                                        {
+                                            <span class="badge bg-info text-dark px-3 py-2 rounded-pill">รอทีมช่างตรวจสภาพ</span>
                                         }
                                         else if (item.BookingStatus == "completed")
                                         {
@@ -88,8 +156,7 @@
                                         }
                                         @if (item.BookingStatus == "confirmed")
                                         {
-                                            var rentalPaid = _db.Payments.Where(payment => payment.BookingId == item.BookingId && payment.PaymentType == "rental" && payment.PaymentStatus == "verified").Sum(payment => (decimal?)payment.Amount) ?? 0m;
-                                            <span class="d-block small mt-1">ค่าเช่าคงเหลือ ฿@Math.Max(0m, item.TotalPrice - rentalPaid).ToString("N2")</span>
+                                            <span class="d-block small mt-1">ค่าเช่าคงเหลือ ฿@rentalRemaining.ToString("N2")</span>
                                             <span class="d-block small mt-1">ใบขับขี่: @item.LicenseStatus</span>
                                             @if (item.LicenseStatus == "rejected" && !string.IsNullOrWhiteSpace(item.LicenseReviewNote))
                                             {
@@ -121,11 +188,30 @@
                                         }
                                         @if (item.BookingStatus == "confirmed")
                                         {
-                                            var rentalPaid = _db.Payments.Where(payment => payment.BookingId == item.BookingId && payment.PaymentType == "rental" && payment.PaymentStatus == "verified").Sum(payment => (decimal?)payment.Amount) ?? 0m;
-                                            @if (rentalPaid < item.TotalPrice)
+                                            @if (rentalRemaining > 0 && !pendingRentalPayment)
                                             {
                                                 <a asp-controller="Payment" asp-action="SubmitRentalPayment" asp-route-bookingId="@item.BookingId" class="btn btn-outline-success btn-sm fw-bold">ชำระค่าเช่า</a>
                                             }
+                                        }
+                                        @if (item.BookingStatus == "rented")
+                                        {
+                                            <form asp-controller="Home" asp-action="RequestReturn" method="post"
+                                                  enctype="multipart/form-data" class="mt-2 text-start"
+                                                  onsubmit="return confirm('ยืนยันส่งรูปและเลขไมล์รถคืนให้พนักงานตรวจสอบหรือไม่?');">
+                                                <input type="hidden" name="id" value="@item.BookingId" />
+                                                <label class="form-label small mb-1">เลขไมล์ปัจจุบัน</label>
+                                                <input name="mileage" type="number" min="0" class="form-control form-control-sm mb-2"
+                                                       placeholder="กรอกเลขไมล์บนหน้าปัด" required />
+                                                <label class="form-label small mb-1">รูปถ่ายรถตอนคืน (1-5 รูป, JPG/PNG ไม่เกิน 5 MB/รูป)</label>
+                                                <input name="returnImages" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                                       class="form-control form-control-sm mb-2" multiple required />
+                                                <button type="submit" class="btn btn-warning btn-sm fw-bold">
+                                                    <i class="fa-solid fa-upload me-1"></i>ส่งข้อมูลคืนรถ
+                                                </button>
+                                            </form>
+                                            <span class="d-block small text-muted mt-1">
+                                                คืนที่ @item.ReturnLocation วันที่ @item.ReturnDate?.ToString("yyyy-MM-dd") @item.ReturnTime
+                                            </span>
                                         }
                                     </td>
                                 </tr>
