@@ -2,7 +2,7 @@
 @using warat_0583_l005.Models
 @{
     ViewData["Title"] = "ตรวจสภาพและซ่อมบำรุง";
-    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
     var cars = (List<CarModel>)ViewBag.Cars;
     var inspections = (List<CarInspectionModel>)ViewBag.Inspections;
     var releaseBookings = (List<BookingModel>)ViewBag.ReleaseInspectionBookings;

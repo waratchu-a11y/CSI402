@@ -7,6 +7,7 @@
     var selectedUserId = ViewBag.SelectedUserId as string;
     var customerNames = (Dictionary<string, string>)ViewBag.CustomerNames;
     var verifiedPayments = (Dictionary<int, decimal>)ViewBag.VerifiedPayments;
+    var workflowSteps = (Dictionary<int, (string Owner, string Task, string? Url)>)ViewBag.WorkflowSteps;
     var editableBookingIds = (HashSet<int>)ViewBag.EditableBookingIds;
     var cancellableBookingIds = (HashSet<int>)ViewBag.CancellableBookingIds;
 
@@ -90,7 +91,7 @@
         </div>
         <div class="card-body p-0 mt-3">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0 booking-responsive-table">
                     <thead class="table-light">
                         <tr>
                             <th class="px-4">รหัส / ลูกค้า</th>
@@ -98,6 +99,7 @@
                             <th>กำหนดการ</th>
                             <th>ยอดจอง / ชำระแล้ว</th>
                             <th>สถานะ</th>
+                            <th>ขั้นตอนถัดไป / ผู้รับงาน</th>
                             <th class="text-end pe-4">จัดการ</th>
                         </tr>
                     </thead>
@@ -106,26 +108,35 @@
                         {
                             customerNames.TryGetValue(booking.UserId, out var customerName);
                             verifiedPayments.TryGetValue(booking.BookingId, out var paidAmount);
+                            workflowSteps.TryGetValue(booking.BookingId, out var workflowStep);
                             <tr>
-                                <td class="px-4">
+                                <td class="px-4" data-label="รหัส / ลูกค้า">
                                     <strong>#BK-@booking.BookingId</strong>
                                     <span class="d-block text-muted small">@(customerName ?? booking.UserId)</span>
                                 </td>
-                                <td>
+                                <td data-label="รถที่จอง">
                                     <strong>@booking.CarModel</strong>
                                     <span class="d-block text-muted small">รถรหัส @(booking.CarId?.ToString() ?? "เดิม")</span>
                                 </td>
-                                <td>
+                                <td data-label="กำหนดการ">
                                     <span class="d-block">รับ: @booking.PickupDate @booking.PickupTime</span>
                                     <span class="d-block text-muted small">คืน: @booking.ReturnDate?.ToString("yyyy-MM-dd") @booking.ReturnTime</span>
                                     <span class="d-block text-muted small">@booking.PickupLocation → @booking.ReturnLocation</span>
                                 </td>
-                                <td>
+                                <td data-label="ยอดจอง / ชำระแล้ว">
                                     <span class="d-block">รวม ฿@booking.TotalPrice.ToString("N2")</span>
                                     <span class="d-block text-muted small">ยืนยันชำระแล้ว ฿@paidAmount.ToString("N2")</span>
                                 </td>
-                                <td><span class="badge rounded-pill bg-light text-dark border">@StatusLabel(booking.BookingStatus)</span></td>
-                                <td class="text-end pe-4 text-nowrap">
+                                <td data-label="สถานะ"><span class="badge badge-motion rounded-pill bg-light text-dark border">@StatusLabel(booking.BookingStatus)</span></td>
+                                <td data-label="ขั้นตอนถัดไป / ผู้รับงาน">
+                                    <strong>@workflowStep.Owner</strong>
+                                    <span class="d-block small text-muted">@workflowStep.Task</span>
+                                    @if (!string.IsNullOrWhiteSpace(workflowStep.Url))
+                                    {
+                                        <a href="@workflowStep.Url" class="small">เปิดหน้าจัดการงานนี้</a>
+                                    }
+                                </td>
+                                <td class="text-end pe-4 text-nowrap" data-label="จัดการ">
                                     @if (editableBookingIds.Contains(booking.BookingId))
                                     {
                                         <a asp-action="EditBooking" asp-route-id="@booking.BookingId" class="btn btn-sm btn-outline-primary">
@@ -151,7 +162,7 @@
                         }
                         @if (!Model.Any())
                         {
-                            <tr><td colspan="6" class="text-center text-muted py-5">ไม่พบรายการจองของลูกค้าที่เลือก</td></tr>
+                            <tr><td colspan="7" class="text-center text-muted py-5" data-label="">ไม่พบรายการจองของลูกค้าที่เลือก</td></tr>
                         }
                     </tbody>
                 </table>

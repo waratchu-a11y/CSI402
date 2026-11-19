@@ -215,8 +215,126 @@ namespace warat_0583_l005.Controllers
                 .ToList()
                 .GroupBy(payment => payment.BookingId)
                 .ToDictionary(group => group.Key, group => group.Sum(payment => payment.Amount));
+            var workflowPayments = _db.Payments
+                .Where(payment => bookingIds.Contains(payment.BookingId) &&
+                    (payment.PaymentType == "deposit" || payment.PaymentType == "rental"))
+                .ToList()
+                .ToLookup(payment => payment.BookingId);
+            var latestReleaseInspections = _db.CarInspections
+                .Where(inspection => bookingIds.Contains(inspection.BookingId) &&
+                    inspection.InspectionStage == "pre_release")
+                .ToList()
+                .GroupBy(inspection => inspection.BookingId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.OrderByDescending(inspection => inspection.InspectionId).First());
+            var bookingCarIds = bookings
+                .Where(booking => booking.CarId.HasValue)
+                .Select(booking => booking.CarId!.Value)
+                .Distinct()
+                .ToList();
+            var carsWithOpenMaintenance = _db.MaintenanceRecords
+                .Where(record => bookingCarIds.Contains(record.CarId) && record.MaintenanceStatus != "completed")
+                .Select(record => record.CarId)
+                .Distinct()
+                .ToHashSet();
+            var workflowSteps = new Dictionary<int, (string Owner, string Task, string? Url)>();
+            foreach (var booking in bookings)
+            {
+                var bookingPayments = workflowPayments[booking.BookingId];
+                string owner;
+                string task;
+                string? url = null;
+
+                if (booking.BookingStatus is "pending" or "pending_payment" or "payment_rejected")
+                {
+                    owner = "ลูกค้า";
+                    task = booking.BookingStatus == "payment_rejected"
+                        ? "ส่งสลิปมัดจำใหม่จากหน้าประวัติการจอง"
+                        : "ชำระมัดจำและส่งสลิปจากหน้าชำระเงิน";
+                }
+                else if (booking.BookingStatus == "payment_review")
+                {
+                    owner = "ฝ่ายการเงิน";
+                    task = "ตรวจสอบสลิปมัดจำ";
+                    url = "/Payment/ReviewQueue";
+                }
+                else if (booking.BookingStatus == "confirmed")
+                {
+                    if (bookingPayments.Any(payment =>
+                        payment.PaymentType == "rental" && payment.PaymentStatus == "pending"))
+                    {
+                        owner = "ฝ่ายการเงิน";
+                        task = "ตรวจสอบสลิปค่าเช่า";
+                        url = "/Payment/ReviewQueue";
+                    }
+                    else if (booking.LicenseStatus == "rejected")
+                    {
+                        owner = "ลูกค้า";
+                        task = "ส่งใบขับขี่ฉบับแก้ไขจากหน้าประวัติการจอง";
+                    }
+                    else if (booking.LicenseStatus != "approved")
+                    {
+                        owner = "พนักงาน";
+                        task = "ตรวจสอบใบขับขี่";
+                        url = "/Operations";
+                    }
+                    else if (booking.CarId.HasValue && carsWithOpenMaintenance.Contains(booking.CarId.Value))
+                    {
+                        owner = "ทีมช่าง";
+                        task = "ซ่อมรถและตรวจซ้ำก่อนปล่อยเช่า";
+                        url = "/Service";
+                    }
+                    else if (!latestReleaseInspections.TryGetValue(booking.BookingId, out var releaseInspection) ||
+                        releaseInspection.InspectionStatus != "passed")
+                    {
+                        owner = "ทีมช่าง";
+                        task = "ตรวจสภาพรถก่อนปล่อยเช่า";
+                        url = "/Service";
+                    }
+                    else
+                    {
+                        decimal rentalPaid = bookingPayments
+                            .Where(payment => payment.PaymentType == "rental" && payment.PaymentStatus == "verified")
+                            .Sum(payment => payment.Amount);
+                        if (rentalPaid < booking.TotalPrice)
+                        {
+                            owner = "ลูกค้า";
+                            task = "ชำระค่าเช่าคงเหลือจากหน้าประวัติการจอง";
+                        }
+                        else
+                        {
+                            owner = "พนักงาน";
+                            task = "ตรวจความพร้อมและส่งมอบรถ";
+                            url = "/Operations";
+                        }
+                    }
+                }
+                else if (booking.BookingStatus is "return_requested" or "rented")
+                {
+                    owner = "พนักงาน";
+                    task = booking.BookingStatus == "return_requested"
+                        ? "ตรวจรับรถคืนจากลูกค้า"
+                        : "รอลูกค้าแจ้งคืนรถ";
+                    url = "/Operations";
+                }
+                else if (booking.BookingStatus == "service_review")
+                {
+                    owner = "ทีมช่าง";
+                    task = "ตรวจสภาพรถหลังรับคืน";
+                    url = "/Service";
+                }
+                else
+                {
+                    owner = "—";
+                    task = booking.BookingStatus == "completed" ? "ดำเนินการเสร็จแล้ว" : "ไม่มีงานต่อ";
+                }
+
+                workflowSteps[booking.BookingId] = (owner, task, url);
+            }
 
             ViewBag.VerifiedPayments = payments;
+            ViewBag.WorkflowSteps = workflowSteps;
             ViewBag.EditableBookingIds = bookings
                 .Where(CanEditBooking)
                 .Select(booking => booking.BookingId)

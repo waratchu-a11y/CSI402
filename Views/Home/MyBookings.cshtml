@@ -15,6 +15,14 @@
         .Where(payment => bookingIds.Contains(payment.BookingId))
         .ToList()
         .ToLookup(payment => payment.BookingId);
+    var latestReleaseInspections = _db.CarInspections
+        .Where(inspection => bookingIds.Contains(inspection.BookingId) &&
+            inspection.InspectionStage == "pre_release")
+        .ToList()
+        .GroupBy(inspection => inspection.BookingId)
+        .ToDictionary(
+            group => group.Key,
+            group => group.OrderByDescending(inspection => inspection.InspectionId).First());
 }
 
 <div class="bg-primary text-white py-4 shadow-sm mb-5" style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
@@ -35,7 +43,7 @@
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0 booking-responsive-table">
                     <thead class="table-light text-secondary small text-uppercase">
                         <tr>
                             <th class="py-3 px-4">รุ่นรถยนต์</th>
@@ -59,16 +67,73 @@
                                 var rentalRemaining = Math.Max(0m, item.TotalPrice - rentalPaid);
                                 var pendingRentalPayment = bookingPayments.Any(payment =>
                                     payment.PaymentType == "rental" && payment.PaymentStatus == "pending");
-                                var rejectedRentalPayment = bookingPayments
-                                    .Where(payment => payment.PaymentType == "rental" && payment.PaymentStatus == "rejected")
+                                var latestRentalPayment = bookingPayments
+                                    .Where(payment => payment.PaymentType == "rental")
                                     .OrderByDescending(payment => payment.PaymentId)
                                     .FirstOrDefault();
+                                var rejectedRentalPayment = latestRentalPayment?.PaymentStatus == "rejected"
+                                    ? latestRentalPayment
+                                    : null;
                                 var rejectedDepositPayment = bookingPayments
                                     .Where(payment => payment.PaymentType == "deposit" && payment.PaymentStatus == "rejected")
                                     .OrderByDescending(payment => payment.PaymentId)
                                     .FirstOrDefault();
+                                var depositVerified = bookingPayments.Any(payment =>
+                                    payment.PaymentType == "deposit" && payment.PaymentStatus == "verified");
+                                var hasReleaseInspection = latestReleaseInspections.TryGetValue(item.BookingId, out var releaseInspection);
+                                var releasePassed = hasReleaseInspection && releaseInspection!.InspectionStatus == "passed";
+                                var releaseFailed = hasReleaseInspection && releaseInspection!.InspectionStatus == "failed";
+                                var rentalPaymentPending = pendingRentalPayment;
+                                var rentalPaymentRejected = rejectedRentalPayment is not null;
+                                var rentalPaidInFull = rentalRemaining <= 0m;
+                                var readyForHandover = depositVerified &&
+                                    item.LicenseStatus == "approved" &&
+                                    releasePassed &&
+                                    rentalPaidInFull;
+                                var currentStageLabel = "กำลังดำเนินการ";
+                                var currentStageClass = "bg-warning text-dark";
+                                if (item.BookingStatus == "confirmed")
+                                {
+                                    if (item.LicenseStatus == "rejected")
+                                    {
+                                        currentStageLabel = "รอส่งใบขับขี่ใหม่";
+                                        currentStageClass = "bg-danger";
+                                    }
+                                    else if (item.LicenseStatus != "approved")
+                                    {
+                                        currentStageLabel = "รอตรวจใบขับขี่";
+                                    }
+                                    else if (releaseFailed)
+                                    {
+                                        currentStageLabel = "ทีมช่างกำลังซ่อมรถ";
+                                        currentStageClass = "bg-danger";
+                                    }
+                                    else if (!releasePassed)
+                                    {
+                                        currentStageLabel = "รอทีมช่างตรวจรถ";
+                                    }
+                                    else if (rentalPaymentPending)
+                                    {
+                                        currentStageLabel = "รอตรวจสอบค่าเช่า";
+                                        currentStageClass = "bg-info text-dark";
+                                    }
+                                    else if (rentalPaymentRejected)
+                                    {
+                                        currentStageLabel = "รอส่งหลักฐานค่าเช่าใหม่";
+                                        currentStageClass = "bg-danger";
+                                    }
+                                    else if (!rentalPaidInFull)
+                                    {
+                                        currentStageLabel = "รอชำระค่าเช่า";
+                                    }
+                                    else if (readyForHandover)
+                                    {
+                                        currentStageLabel = "รอพนักงานส่งมอบรถ";
+                                        currentStageClass = "bg-info text-dark";
+                                    }
+                                }
                                 <tr>
-                                    <td class="py-3 px-4 fw-bold text-dark">
+                                    <td class="py-3 px-4 fw-bold text-dark" data-label="รถยนต์ / รหัสจอง">
                                         <div class="d-flex align-items-center">
                                             <i class="fa-solid fa-car text-primary fs-4 me-3"></i>
                                             <div>
@@ -77,23 +142,23 @@
                                             </div>
                                         </div>
                                     </td>
-                                    <td>@item.PickupLocation</td>
-                                    <td>@item.PickupDate</td>
-                                    <td>@item.RentalDays วัน</td>
-                                    <td class="fw-bold text-primary">฿@item.TotalPrice.ToString("N0")</td>
-                                    <td class="text-center">
+                                    <td data-label="สถานที่รับรถ">@item.PickupLocation</td>
+                                    <td data-label="วันที่รับรถ">@item.PickupDate</td>
+                                    <td data-label="จำนวนวัน">@item.RentalDays วัน</td>
+                                    <td class="fw-bold text-primary" data-label="ราคารวม">฿@item.TotalPrice.ToString("N0")</td>
+                                    <td class="text-center" data-label="สถานะ">
                                         @if (item.BookingStatus == "pending_payment")
                                         {
-                                            <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">รอชำระมัดจำ</span>
+                                            <span class="badge badge-motion bg-warning text-dark px-3 py-2 rounded-pill">รอชำระมัดจำ</span>
                                         }
                                         else if (item.BookingStatus == "payment_rejected")
                                         {
-                                            <span class="badge bg-danger px-3 py-2 rounded-pill">มัดจำถูกปฏิเสธ</span>
+                                            <span class="badge badge-motion bg-danger px-3 py-2 rounded-pill">มัดจำถูกปฏิเสธ</span>
                                             <span class="d-block small text-danger mt-1">@(rejectedDepositPayment?.Note ?? "กรุณาส่งหลักฐานมัดจำใหม่")</span>
                                         }
                                         else if (item.BookingStatus == "payment_review")
                                         {
-                                            <span class="badge bg-info text-dark px-3 py-2 rounded-pill">รอตรวจสอบสลิป</span>
+                                            <span class="badge badge-motion bg-info text-dark px-3 py-2 rounded-pill">รอตรวจสอบสลิป</span>
                                             <div class="alert alert-info py-2 px-3 mt-2 mb-0 small text-start">
                                                 <i class="fa-solid fa-hourglass-half me-1"></i>
                                                 ได้รับหลักฐานมัดจำแล้ว กำลังตรวจสอบโดยฝ่ายการเงิน
@@ -101,7 +166,7 @@
                                         }
                                         else if (item.BookingStatus == "confirmed")
                                         {
-                                            <span class="badge bg-success px-3 py-2 rounded-pill">ยืนยันแล้ว</span>
+                                            <span class="badge badge-motion @currentStageClass px-3 py-2 rounded-pill">@currentStageLabel</span>
                                             @if (pendingRentalPayment)
                                             {
                                                 <div class="alert alert-info py-2 px-3 mt-2 mb-0 small text-start">
@@ -109,7 +174,7 @@
                                                     กำลังตรวจสอบหลักฐานชำระค่าเช่าโดยฝ่ายการเงิน
                                                 </div>
                                             }
-                                            else if (rejectedRentalPayment is not null)
+                                            else if (rejectedRentalPayment is not null && rentalRemaining > 0)
                                             {
                                                 <div class="alert alert-warning py-2 px-3 mt-2 mb-0 small text-start">
                                                     <i class="fa-solid fa-triangle-exclamation me-1"></i>
@@ -132,11 +197,11 @@
                                         }
                                         else if (item.BookingStatus == "rented")
                                         {
-                                            <span class="badge bg-primary px-3 py-2 rounded-pill">กำลังเช่า</span>
+                                            <span class="badge badge-motion bg-primary px-3 py-2 rounded-pill">กำลังเช่า</span>
                                         }
                                         else if (item.BookingStatus == "return_requested")
                                         {
-                                            <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">รอพนักงานตรวจรับคืน</span>
+                                            <span class="badge badge-motion bg-warning text-dark px-3 py-2 rounded-pill">รอพนักงานตรวจรับคืน</span>
                                             <div class="alert alert-info py-2 px-3 mt-2 mb-0 small text-start">
                                                 <i class="fa-solid fa-hourglass-half me-1"></i>
                                                 ส่งข้อมูลแล้ว กรุณานำรถส่งมอบให้พนักงานตรวจรับ
@@ -144,27 +209,29 @@
                                         }
                                         else if (item.BookingStatus == "service_review")
                                         {
-                                            <span class="badge bg-info text-dark px-3 py-2 rounded-pill">รอทีมช่างตรวจสภาพ</span>
+                                            <span class="badge badge-motion bg-info text-dark px-3 py-2 rounded-pill">รอทีมช่างตรวจสภาพ</span>
                                         }
                                         else if (item.BookingStatus == "completed")
                                         {
-                                            <span class="badge bg-secondary px-3 py-2 rounded-pill">คืนรถแล้ว</span>
+                                            <span class="badge badge-motion bg-secondary px-3 py-2 rounded-pill">คืนรถแล้ว</span>
                                         }
                                         else
                                         {
-                                            <span class="badge bg-secondary px-3 py-2 rounded-pill">@item.BookingStatus</span>
+                                            <span class="badge badge-motion bg-secondary px-3 py-2 rounded-pill">@item.BookingStatus</span>
                                         }
                                         @if (item.BookingStatus == "confirmed")
                                         {
                                             <span class="d-block small mt-1">ค่าเช่าคงเหลือ ฿@rentalRemaining.ToString("N2")</span>
-                                            <span class="d-block small mt-1">ใบขับขี่: @item.LicenseStatus</span>
+                                            <span class="d-block small mt-1">ใบขับขี่:
+                                                @(item.LicenseStatus == "approved" ? "ผ่านการตรวจแล้ว" : item.LicenseStatus == "rejected" ? "ไม่ผ่าน" : "รอตรวจสอบ")
+                                            </span>
                                             @if (item.LicenseStatus == "rejected" && !string.IsNullOrWhiteSpace(item.LicenseReviewNote))
                                             {
                                                 <span class="d-block small text-danger">@item.LicenseReviewNote</span>
                                             }
                                         }
                                     </td>
-                                    <td class="text-center">
+                                    <td class="text-center" data-label="จัดการ">
                                         @if (item.LicenseStatus == "rejected" && item.BookingStatus == "confirmed")
                                         {
                                             <form asp-controller="Payment" asp-action="SubmitLicense" method="post" enctype="multipart/form-data" class="mb-2">
@@ -220,7 +287,7 @@
                         else
                         {
                             <tr>
-                                <td colspan="7" class="text-center py-5 text-muted">
+                                <td colspan="7" class="text-center py-5 text-muted" data-label="">
                                     <i class="fa-solid fa-folder-open fa-2x mb-2 d-block"></i> ยังไม่มีประวัติการจองรถในระบบ
                                 </td>
                             </tr>

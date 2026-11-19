@@ -18,7 +18,7 @@
     <div class="position-absolute" style="bottom: -80px; left: -50px; width: 300px; height: 300px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
 
     <div class="container text-center mt-4 position-relative z-1">
-        <span class="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bold mb-3 shadow-sm">
+        <span class="badge badge-motion bg-warning text-dark px-3 py-2 rounded-pill fw-bold mb-3 shadow-sm">
             <i class="fa-solid fa-car-side me-1"></i> บริการเช่ารถอันดับ 1 ของคุณ
         </span>
         <h1 class="display-3 fw-bold mb-2">ค้นหารถเช่าที่เหมาะกับคุณ</h1>
@@ -75,7 +75,8 @@
             </a>
         </div>
 
-        <div class="row g-3 g-lg-4">
+        <div id="promoCarousel" class="carousel slide promo-carousel" aria-label="รายการโปรโมชัน">
+            <div class="carousel-inner">
             @for (var index = 0; index < promotions.Count; index++)
             {
                 var promotion = promotions[index];
@@ -91,44 +92,47 @@
                 };
                 var startsLater = promotion.StartDate.HasValue && promotion.StartDate.Value.Date > DateTime.Today;
 
-                <div class="col-md-6 col-xl-4">
+                <div class="carousel-item @(index == 0 ? "active" : "")" role="group" aria-label="โปรโมชัน @(index + 1) จาก @promotions.Count">
                     <article class="promo-card @themeClass h-100">
                         <div class="promo-card-glow"></div>
                         <div class="promo-card-content">
-                            <div class="d-flex justify-content-between align-items-start gap-2">
-                                <span class="promo-status @(startsLater ? "promo-status-upcoming" : "")">
-                                    <i class="fa-solid @(startsLater ? "fa-clock" : "fa-bolt") me-1"></i>
-                                    @(startsLater ? "เร็ว ๆ นี้" : "ข้อเสนอพิเศษ")
-                                </span>
-                                <i class="fa-solid fa-ticket promo-ticket-icon" aria-hidden="true"></i>
-                            </div>
-                            <div class="promo-discount mt-3">
-                                <span class="promo-discount-number">@promotion.DiscountPercent.ToString("0.#")</span>
-                                <span class="promo-discount-symbol">%</span>
-                                <span class="promo-discount-label">OFF</span>
-                            </div>
-                            <h3 class="promo-title">@promotion.PromotionName</h3>
-                            <p class="promo-condition mb-3">@conditionLabel</p>
-
-                            @if (promotion.StartDate.HasValue || promotion.EndDate.HasValue)
-                            {
-                                <div class="promo-validity">
-                                    <i class="fa-regular fa-calendar me-1"></i>
-                                    @if (promotion.StartDate.HasValue && promotion.EndDate.HasValue)
-                                    {
-                                        <span>@promotion.StartDate.Value.ToString("dd MMM yyyy", thaiCulture) – @promotion.EndDate.Value.ToString("dd MMM yyyy", thaiCulture)</span>
-                                    }
-                                    else if (promotion.StartDate.HasValue)
-                                    {
-                                        <span>เริ่ม @promotion.StartDate.Value.ToString("dd MMM yyyy", thaiCulture)</span>
-                                    }
-                                    else
-                                    {
-                                        <span>ใช้ได้ถึง @promotion.EndDate!.Value.ToString("dd MMM yyyy", thaiCulture)</span>
-                                    }
+                            <div class="promo-card-main">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <span class="promo-status badge-motion @(startsLater ? "promo-status-upcoming" : "")">
+                                        <i class="fa-solid @(startsLater ? "fa-clock" : "fa-bolt") me-1"></i>
+                                        @(startsLater ? "เร็ว ๆ นี้" : "ข้อเสนอพิเศษ")
+                                    </span>
+                                    <i class="fa-solid fa-ticket promo-ticket-icon" aria-hidden="true"></i>
                                 </div>
-                            }
+                                <div class="promo-discount mt-3">
+                                    <span class="promo-discount-number">@promotion.DiscountPercent.ToString("0.#")</span>
+                                    <span class="promo-discount-symbol">%</span>
+                                    <span class="promo-discount-label">OFF</span>
+                                </div>
+                            </div>
+                            <div class="promo-details">
+                                <h3 class="promo-title">@promotion.PromotionName</h3>
+                                <p class="promo-condition mb-3">@conditionLabel</p>
 
+                                @if (promotion.StartDate.HasValue || promotion.EndDate.HasValue)
+                                {
+                                    <div class="promo-validity">
+                                        <i class="fa-regular fa-calendar me-1"></i>
+                                        @if (promotion.StartDate.HasValue && promotion.EndDate.HasValue)
+                                        {
+                                            <span>@promotion.StartDate.Value.ToString("dd MMM yyyy", thaiCulture) – @promotion.EndDate.Value.ToString("dd MMM yyyy", thaiCulture)</span>
+                                        }
+                                        else if (promotion.StartDate.HasValue)
+                                        {
+                                            <span>เริ่ม @promotion.StartDate.Value.ToString("dd MMM yyyy", thaiCulture)</span>
+                                        }
+                                        else
+                                        {
+                                            <span>ใช้ได้ถึง @promotion.EndDate!.Value.ToString("dd MMM yyyy", thaiCulture)</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
                             <div class="promo-card-footer">
                                 @if (!string.IsNullOrWhiteSpace(promotion.PromotionCode))
                                 {
@@ -146,6 +150,7 @@
                     </article>
                 </div>
             }
+            </div>
         </div>
     </section>
 }
@@ -190,7 +195,7 @@ else
                     <div class="card h-100 shadow-sm car-card @(isAvailable ? "" : "opacity-75")" style="border-radius: 20px; border: none; overflow: hidden; transition: all 0.3s ease;">
                         <a asp-controller="Home" asp-action="CarDetail" asp-route-carName="@car.CarName" class="position-relative overflow-hidden d-block" style="height: 220px;">
                             <img src="@car.ImageUrl" class="card-img-top car-img" alt="@car.CarName" style="height: 100%; object-fit: cover; transition: transform 0.5s ease;" onerror="this.src='https://via.placeholder.com/400x220?text=No+Image';">
-                            <span class="badge @(isAvailable ? "bg-success" : "bg-danger") position-absolute top-0 end-0 m-3 px-3 py-2 shadow-sm rounded-pill z-1">
+                            <span class="badge badge-motion @(isAvailable ? "bg-success" : "bg-danger") position-absolute top-0 end-0 m-3 px-3 py-2 shadow-sm rounded-pill z-1">
                                 <i class="fa-solid @(isAvailable ? "fa-circle-check" : "fa-circle-xmark") me-1"></i>@(isAvailable ? "พร้อมใช้งาน" : "ไม่ว่าง")
                             </span>
                         </a>
@@ -267,10 +272,30 @@ else
         updateReturnDateRange();
     });
 </script>
+@section Scripts {
+<script>
+    (() => {
+        const carouselElement = document.getElementById('promoCarousel');
+        if (!carouselElement || carouselElement.querySelectorAll('.carousel-item').length < 2) return;
+
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        new bootstrap.Carousel(carouselElement, {
+            interval: prefersReducedMotion ? false : 5000,
+            pause: 'hover',
+            ride: prefersReducedMotion ? false : 'carousel',
+            touch: true,
+            wrap: true
+        });
+    })();
+</script>
+}
 
 <style>
     .promo-announcements {
         --promo-ink: #172033;
+    }
+    .promo-carousel {
+        padding-bottom: .15rem;
     }
     .promo-empty {
         position: relative;
@@ -278,8 +303,8 @@ else
         align-items: center;
         gap: 1.5rem;
         overflow: hidden;
-        min-height: 170px;
-        padding: 1.5rem clamp(1.25rem, 4vw, 2.5rem);
+        min-height: 150px;
+        padding: 1.25rem clamp(1.1rem, 3vw, 2rem);
         border: 1px solid #e6edf7;
         border-radius: 22px;
         background: linear-gradient(110deg, #fff 0%, #f3f8ff 55%, #eefaff 100%);
@@ -288,12 +313,12 @@ else
     .promo-empty-art {
         position: relative;
         display: flex;
-        flex: 0 0 92px;
+        flex: 0 0 76px;
         align-items: center;
         justify-content: center;
-        width: 92px;
-        height: 92px;
-        border-radius: 24px;
+        width: 76px;
+        height: 76px;
+        border-radius: 20px;
         background: linear-gradient(145deg, #0d6efd, #10b9dc);
         color: #fff;
         font-size: 2rem;
@@ -304,14 +329,14 @@ else
         top: -9px;
         right: -9px;
         display: grid;
-        width: 34px;
-        height: 34px;
+        width: 28px;
+        height: 28px;
         place-items: center;
         border: 3px solid #fff;
         border-radius: 50%;
         background: #ffc107;
         color: #172033;
-        font-size: 1rem;
+        font-size: .85rem;
         font-weight: 700;
     }
     .promo-empty-copy {
@@ -336,10 +361,9 @@ else
     }
     .promo-card {
         position: relative;
-        min-height: 285px;
         overflow: hidden;
         isolation: isolate;
-        border-radius: 22px;
+        border-radius: 20px;
         color: #fff;
         box-shadow: 0 12px 30px rgba(23, 32, 51, .12);
         transition: transform .25s ease, box-shadow .25s ease;
@@ -365,10 +389,18 @@ else
     }
     .promo-card-content {
         position: relative;
-        display: flex;
-        flex-direction: column;
-        min-height: 285px;
-        padding: 1.45rem;
+        display: grid;
+        grid-template-columns: minmax(140px, .65fr) minmax(0, 1.25fr) minmax(170px, .8fr);
+        align-items: center;
+        gap: clamp(1rem, 3vw, 2rem);
+        min-height: 185px;
+        padding: 1.5rem clamp(1.25rem, 3vw, 2rem);
+    }
+    .promo-card-main {
+        min-width: 0;
+    }
+    .promo-card-main > .d-flex {
+        align-items: center !important;
     }
     .promo-status {
         display: inline-flex;
@@ -376,9 +408,9 @@ else
         border: 1px solid rgba(255,255,255,.25);
         border-radius: 999px;
         background: rgba(255,255,255,.16);
-        padding: .38rem .75rem;
+        padding: .28rem .58rem;
         color: #fff;
-        font-size: .78rem;
+        font-size: .68rem;
         font-weight: 500;
     }
     .promo-status-upcoming {
@@ -387,7 +419,7 @@ else
     }
     .promo-ticket-icon {
         color: rgba(255,255,255,.66);
-        font-size: 1.4rem;
+        font-size: 1.2rem;
         transform: rotate(-12deg);
     }
     .promo-discount {
@@ -396,55 +428,57 @@ else
         line-height: .9;
     }
     .promo-discount-number {
-        font-size: 3.65rem;
+        font-size: 2.85rem;
         font-weight: 700;
         letter-spacing: -.06em;
     }
     .promo-discount-symbol {
         margin: .15rem 0 0 .1rem;
-        font-size: 1.6rem;
+        font-size: 1.25rem;
         font-weight: 600;
     }
     .promo-discount-label {
         align-self: flex-end;
-        margin: 0 0 .25rem .55rem;
-        font-size: .72rem;
+        margin: 0 0 .2rem .45rem;
+        font-size: .64rem;
         font-weight: 700;
         letter-spacing: .13em;
         opacity: .8;
     }
     .promo-title {
-        margin: .8rem 0 .2rem;
-        font-size: 1.2rem;
+        margin: 0 0 .35rem;
+        font-size: clamp(1.1rem, 1.8vw, 1.4rem);
         font-weight: 600;
     }
     .promo-condition,
     .promo-validity {
         color: rgba(255,255,255,.82);
-        font-size: .88rem;
+        font-size: .82rem;
     }
     .promo-validity {
-        margin-top: auto;
-        padding-top: .6rem;
+        margin-top: .75rem;
         font-size: .8rem;
     }
     .promo-card-footer {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: .75rem;
-        margin-top: 1rem;
-        padding-top: 1rem;
-        border-top: 1px solid rgba(255,255,255,.2);
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 1rem;
+        min-height: 100px;
+        margin: 0;
+        padding-left: clamp(1rem, 2vw, 1.5rem);
+        border-top: 0;
+        border-left: 1px solid rgba(255,255,255,.25);
     }
     .promo-code {
-        max-width: 62%;
+        max-width: 100%;
         overflow: hidden;
         border: 1px dashed rgba(255,255,255,.56);
         border-radius: 8px;
-        padding: .38rem .62rem;
+        padding: .3rem .52rem;
         color: #fff;
-        font-size: .8rem;
+        font-size: .72rem;
         font-weight: 600;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -466,6 +500,32 @@ else
         text-decoration: underline;
     }
     @@media (max-width: 767.98px) {
+        .promo-card-content {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            min-height: 0;
+            padding: 1.25rem;
+        }
+        .promo-card-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        .promo-card-main .promo-discount {
+            flex-shrink: 0;
+            margin-top: 0 !important;
+        }
+        .promo-card-footer {
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            min-height: 0;
+            padding: .8rem 0 0;
+            border-top: 1px solid rgba(255,255,255,.2);
+            border-left: 0;
+        }
         .promo-empty {
             flex-wrap: wrap;
             gap: 1rem;

@@ -2,7 +2,7 @@
 @using warat_0583_l005.Models
 @{
     ViewData["Title"] = "ตรวจสอบการชำระเงิน";
-    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
     var bookings = (Dictionary<int, BookingModel>)ViewBag.Bookings;
     var refundableBookings = (List<BookingModel>)ViewBag.RefundableBookings;
     var pendingPayments = Model.Where(payment => payment.PaymentType != "refund").ToList();

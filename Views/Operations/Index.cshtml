@@ -2,7 +2,7 @@
 @using warat_0583_l005.Models
 @{
     ViewData["Title"] = "งานรับ-คืนรถ";
-    Layout = "~/Views/Shared/_CustomerLayout.cshtml";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
     var latestInspections = (Dictionary<int, CarInspectionModel>)ViewBag.LatestInspections;
     var readyForPickupBookingIds = (HashSet<int>)ViewBag.ReadyForPickupBookingIds;
 }
