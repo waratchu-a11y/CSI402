@@ -2179,11 +2179,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\usEr\\Desktop\\warat_0583_l005\\warat_0583_l005.csproj",
+      "projectUniqueName": "C:\\Users\\usEr\\Desktop\\CSI402\\warat_0583_l005.csproj",
       "projectName": "warat_0583_l005",
-      "projectPath": "C:\\Users\\usEr\\Desktop\\warat_0583_l005\\warat_0583_l005.csproj",
+      "projectPath": "C:\\Users\\usEr\\Desktop\\CSI402\\warat_0583_l005.csproj",
       "packagesPath": "C:\\Users\\usEr\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\usEr\\Desktop\\warat_0583_l005\\obj\\",
+      "outputPath": "C:\\Users\\usEr\\Desktop\\CSI402\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\usEr\\AppData\\Roaming\\NuGet\\NuGet.Config"

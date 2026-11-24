@@ -13,12 +13,10 @@ namespace warat_0583_l005.Controllers;
 public class HomeController : Controller
 {
     private readonly Csi402dbContext _db;
-    private readonly PrivateUploadStorage _uploadStorage;
 
-    public HomeController(Csi402dbContext db, PrivateUploadStorage uploadStorage)
+    public HomeController(Csi402dbContext db)
     {
         _db = db;
-        _uploadStorage = uploadStorage;
     }
 
     public IActionResult Index()
@@ -186,18 +184,25 @@ public class HomeController : Controller
     [Authorize]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RequestReturn(int id, int mileage, IFormFile[]? returnImages)
+    public async Task<IActionResult> RequestReturn(int id)
     {
         if (!RoleAccess.HasRole(_db, User, "Customer"))
         {
             return Forbid();
         }
 
-        var booking = _db.Bookings.FirstOrDefault(item =>
-            item.BookingId == id && item.UserId == User.Identity!.Name);
+        await using var transaction = await _db.Database.BeginTransactionAsync(HttpContext.RequestAborted);
+        var booking = await _db.Bookings
+            .FromSqlInterpolated($"SELECT * FROM bookings WHERE BookingId = {id} FOR UPDATE")
+            .FirstOrDefaultAsync(HttpContext.RequestAborted);
         if (booking is null)
         {
             return NotFound();
+        }
+
+        if (booking.UserId != User.Identity!.Name)
+        {
+            return Forbid();
         }
 
         if (booking.BookingStatus != "rented")
@@ -205,74 +210,20 @@ public class HomeController : Controller
             return Conflict("แจ้งคืนรถได้เฉพาะรายการที่กำลังเช่า");
         }
 
-        var pickupInspection = _db.CarInspections
-            .Where(inspection => inspection.BookingId == id &&
-                inspection.InspectionStage == "before_pickup")
-            .OrderByDescending(inspection => inspection.InspectionId)
-            .FirstOrDefault();
-        if (pickupInspection is null || mileage < pickupInspection.Mileage)
-        {
-            TempData["PaymentMessage"] = "เลขไมล์คืนรถต้องไม่น้อยกว่าเลขไมล์ตอนรับรถ";
-            return RedirectToAction(nameof(MyBookings));
-        }
-
         var car = booking.CarId.HasValue
-            ? _db.Cars.FirstOrDefault(item => item.CarId == booking.CarId.Value)
+            ? await _db.Cars.FirstOrDefaultAsync(item => item.CarId == booking.CarId.Value, HttpContext.RequestAborted)
             : null;
         if (car is null)
         {
             return NotFound("ไม่พบข้อมูลรถที่จอง");
         }
 
-        var images = returnImages?.Where(image => image.Length > 0).ToList() ?? [];
-        if (images.Count is < 1 or > 5 || images.Any(image => image.Length > 5 * 1024 * 1024))
-        {
-            TempData["PaymentMessage"] = "กรุณาแนบรูปรถ 1-5 รูป โดยแต่ละรูปมีขนาดไม่เกิน 5 MB";
-            return RedirectToAction(nameof(MyBookings));
-        }
-
-        var savedImagePaths = new List<string>(images.Count);
-        foreach (var image in images)
-        {
-            string? savedImagePath = await _uploadStorage.SaveImageAsync(image, HttpContext.RequestAborted);
-            if (savedImagePath is null)
-            {
-                foreach (string savedPath in savedImagePaths)
-                {
-                    _uploadStorage.Delete(savedPath);
-                }
-
-                TempData["PaymentMessage"] = "รูปภาพไม่ถูกต้อง กรุณาใช้ไฟล์ JPG หรือ PNG";
-                return RedirectToAction(nameof(MyBookings));
-            }
-
-            savedImagePaths.Add(savedImagePath);
-        }
-
-        await using var transaction = await _db.Database.BeginTransactionAsync(HttpContext.RequestAborted);
-        var currentBooking = await _db.Bookings
-            .FromSqlInterpolated($"SELECT * FROM bookings WHERE BookingId = {id} FOR UPDATE")
-            .AsNoTracking()
-            .FirstOrDefaultAsync(HttpContext.RequestAborted);
-        if (currentBooking?.BookingStatus != "rented")
-        {
-            foreach (string savedPath in savedImagePaths)
-            {
-                _uploadStorage.Delete(savedPath);
-            }
-
-            TempData["PaymentMessage"] = "สถานะรายการจองเปลี่ยนไปแล้ว กรุณาตรวจสอบรายการอีกครั้ง";
-            return RedirectToAction(nameof(MyBookings));
-        }
-
-        booking.ReturnMileage = mileage;
-        booking.ReturnImagePaths = string.Join('|', savedImagePaths);
         booking.ReturnSubmittedAt = DateTime.Now;
-        booking.BookingStatus = "return_requested";
+        booking.BookingStatus = "service_review";
         car.Status = "รอตรวจสภาพ";
         await _db.SaveChangesAsync(HttpContext.RequestAborted);
         await transaction.CommitAsync(HttpContext.RequestAborted);
-        TempData["PaymentMessage"] = $"ส่งข้อมูลคืนรถ Booking #{booking.BookingId} แล้ว กรุณานำรถส่งมอบให้พนักงานตรวจรับ";
+        TempData["PaymentMessage"] = $"แจ้งส่งคืนรถ Booking #{booking.BookingId} แล้ว สถานะ: รอช่างตรวจสอบคืนรถ";
         return RedirectToAction(nameof(MyBookings));
     }
 

@@ -102,29 +102,21 @@
     <div class="card shadow-sm mb-4">
         <div class="card-header fw-bold"><i class="fa-solid fa-car-burst text-warning me-2"></i>ตรวจรถหลังลูกค้าคืน</div>
         <div class="card-body">
-            <p class="text-muted small">ตรวจรูปที่ลูกค้าส่งและบันทึกจากพนักงานรับรถ จากนั้นยืนยันว่าพบความเสียหายหรือไม่</p>
+            <p class="text-muted small">ตรวจรถจริงและบันทึกเลขไมล์ น้ำมัน และความเสียหาย เมื่อตรวจเสร็จรายการจะส่งต่อฝ่ายการเงินเพื่อคืนมัดจำ</p>
             <div class="table-responsive">
                 <table class="table align-middle">
-                    <thead><tr><th>รายการจอง / ลูกค้า</th><th>หลักฐานจากลูกค้า</th><th>ผลรับรถจากพนักงาน</th><th>ผลตรวจทีมช่าง</th></tr></thead>
+                    <thead><tr><th>รายการจอง / ลูกค้า</th><th>การแจ้งคืนรถ</th><th>ข้อมูลรับรถจากพนักงาน</th><th>ผลตรวจทีมช่าง</th></tr></thead>
                     <tbody>
                     @foreach (var booking in returnReviewBookings)
                     {
-                        var returnImages = booking.ReturnImagePaths?.Split('|', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
                         <tr>
                             <td>
                                 <strong>#BK-@booking.BookingId — @booking.CarModel</strong>
                                 <span class="d-block text-muted small">@booking.UserId</span>
                             </td>
                             <td>
-                                <span class="d-block small">ลูกค้าแจ้งเลขไมล์ @booking.ReturnMileage กม.</span>
-                                <div class="d-flex flex-wrap gap-2 mt-1">
-                                    @for (int imageIndex = 0; imageIndex < returnImages.Length; imageIndex++)
-                                    {
-                                        <a asp-controller="Payment" asp-action="ReturnPhoto"
-                                           asp-route-bookingId="@booking.BookingId" asp-route-imageIndex="@imageIndex"
-                                           target="_blank" rel="noopener">เปิดรูปที่ @(imageIndex + 1)</a>
-                                    }
-                                </div>
+                                <span class="d-block small">ลูกค้าแจ้งส่งคืนรถ</span>
+                                <span class="d-block small text-muted">@booking.ReturnSubmittedAt?.ToString("g")</span>
                             </td>
                             <td>
                                 @if (returnReceivedInspections.TryGetValue(booking.BookingId, out var receivedInspection))
@@ -137,6 +129,14 @@
                             <td style="min-width: 340px;">
                                 <form asp-action="InspectAfterReturn" method="post" class="row g-2">
                                     <input type="hidden" name="bookingId" value="@booking.BookingId" />
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">เลขไมล์ที่ช่างตรวจ</label>
+                                        <input name="mileage" type="number" min="0" class="form-control form-control-sm" required />
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">น้ำมัน (%)</label>
+                                        <input name="fuelLevel" type="number" min="0" max="100" class="form-control form-control-sm" required />
+                                    </div>
                                     <div class="col-12 d-flex gap-3">
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="damageFound" value="false" id="no-damage-@booking.BookingId" required />

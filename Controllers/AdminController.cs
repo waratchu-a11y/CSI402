@@ -310,13 +310,16 @@ namespace warat_0583_l005.Controllers
                         }
                     }
                 }
-                else if (booking.BookingStatus is "return_requested" or "rented")
+                else if (booking.BookingStatus == "return_requested")
                 {
                     owner = "พนักงาน";
-                    task = booking.BookingStatus == "return_requested"
-                        ? "ตรวจรับรถคืนจากลูกค้า"
-                        : "รอลูกค้าแจ้งคืนรถ";
+                    task = "ตรวจรับรถคืนจากลูกค้า";
                     url = "/Operations";
+                }
+                else if (booking.BookingStatus == "rented")
+                {
+                    owner = "ลูกค้า";
+                    task = "แจ้งส่งคืนรถจากหน้าประวัติการจอง";
                 }
                 else if (booking.BookingStatus == "service_review")
                 {

@@ -9,8 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Net;
-using System.Net.Mail;
 using warat_0583_l005.Models;
 using warat_0583_l005.Services;
 using warat_0583_l005.ViewModels;
@@ -24,36 +22,11 @@ namespace warat_0583_l005.Controllers
         private readonly PrivateUploadStorage _uploadStorage;
         private readonly PasswordHasher<UserModel> _passwordHasher = new();
 
-        // ตัวแปรแบบ static สำหรับเก็บข้อมูลชั่วคราวก่อนผู้ใช้กดยืนยัน OTP
-        private static Dictionary<string, (UserModel user, string otp)> PendingUsers = new();
-
         public AccountController(Csi402dbContext db, IConfiguration configuration, PrivateUploadStorage uploadStorage)
         {
             _db = db;
             _configuration = configuration;
             _uploadStorage = uploadStorage;
-        }
-
-        // ====================================================
-        // ฟังก์ชันช่วยส่งอีเมล OTP
-        // ====================================================
-        private void SendOtpEmail(string toEmail, string otp)
-        {
-            string fromEmail = _configuration["Smtp:From"]
-                ?? throw new InvalidOperationException("SMTP sender address is not configured.");
-            string appPassword = _configuration["Smtp:AppPassword"]
-                ?? throw new InvalidOperationException("SMTP credentials are not configured.");
-
-            MailMessage mail = new MailMessage();
-            mail.From = new MailAddress(fromEmail);
-            mail.To.Add(toEmail);
-            mail.Subject = "รหัสยืนยันการสมัครสมาชิก (OTP)";
-            mail.Body = $"รหัส OTP ของคุณคือ: {otp}\nกรุณานำรหัสนี้ไปกรอกในหน้าเว็บไซต์เพื่อยืนยันการสมัครสมาชิก";
-
-            SmtpClient smtp = new SmtpClient("smtp.gmail.com", 587);
-            smtp.Credentials = new NetworkCredential(fromEmail, appPassword);
-            smtp.EnableSsl = true;
-            smtp.Send(mail);
         }
 
         // ====================================================
@@ -169,7 +142,7 @@ namespace warat_0583_l005.Controllers
         }
 
         // ====================================================
-        // 2. หน้า Register (สมัครสมาชิก + ส่ง OTP ยืนยัน)
+        // 2. หน้า Register (สมัครสมาชิก)
         // ====================================================
         [HttpGet]
         public IActionResult Register()
@@ -194,31 +167,15 @@ namespace warat_0583_l005.Controllers
                         Phone = string.IsNullOrEmpty(model.Phone) ? "ไม่ระบุ" : model.Phone,
                         Gender = string.IsNullOrEmpty(model.Gender) ? "ไม่ระบุ" : model.Gender,
                         IdCard = string.IsNullOrEmpty(model.IdCard) ? "ไม่ระบุ" : model.IdCard,
-                        
-                        // 📌 เพิ่มบรรทัดนี้เพื่อบันทึกเลขใบขับขี่
-                        DriverLicense = string.IsNullOrEmpty(model.DriverLicense) ? "ไม่ระบุ" : model.DriverLicense,
-                        
                         Role = "Customer",
                         RegisterDate = DateTime.Now
                     };
                     newUser.Password = _passwordHasher.HashPassword(newUser, model.Password);
 
-                    Random rnd = new Random();
-                    string otp = rnd.Next(100000, 999999).ToString();
+                    _db.Add(newUser);
+                    _db.SaveChanges();
 
-                    PendingUsers[model.Username] = (newUser, otp);
-
-                    try
-                    {
-                        SendOtpEmail(model.Email, otp);
-                    }
-                    catch (Exception ex)
-                    {
-                        ModelState.AddModelError("", "ไม่สามารถส่งอีเมล OTP ได้: " + ex.Message);
-                        return View(model);
-                    }
-
-                    return RedirectToAction("VerifyOtp", new { username = model.Username });
+                    return RedirectToAction("Indexcustomer", "Home");
                 }
                 else
                 {
@@ -226,38 +183,6 @@ namespace warat_0583_l005.Controllers
                 }
             }
             return View(model);
-        }
-
-        // ====================================================
-        // 2.5 หน้าตรวจสอบรหัส OTP (Verify OTP)
-        // ====================================================
-        [HttpGet]
-        public IActionResult VerifyOtp(string username)
-        {
-            ViewBag.Username = username;
-            return View();
-        }
-
-        [HttpPost]
-        public IActionResult VerifyOtp(string username, string otp)
-        {
-            if (PendingUsers.ContainsKey(username))
-            {
-                var pendingData = PendingUsers[username];
-
-                if (pendingData.otp == otp)
-                {
-                    _db.Add(pendingData.user);
-                    _db.SaveChanges();
-                    PendingUsers.Remove(username);
-
-                    return RedirectToAction("Indexcustomer", "Home");
-                }
-            }
-
-            ViewBag.Username = username;
-            ViewBag.Error = "รหัส OTP ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
-            return View();
         }
 
         // ====================================================

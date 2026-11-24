@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("warat_0583_l005")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+89a33f7515df4b035abbf4a4d2cc788987283a9c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+60638dae56205da62caee47ad2b562eda6c667c9")]
 [assembly: System.Reflection.AssemblyProductAttribute("warat_0583_l005")]
 [assembly: System.Reflection.AssemblyTitleAttribute("warat_0583_l005")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

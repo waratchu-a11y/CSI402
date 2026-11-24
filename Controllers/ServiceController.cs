@@ -206,6 +206,8 @@ public class ServiceController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult InspectAfterReturn(
         int bookingId,
+        int mileage,
+        int fuelLevel,
         bool damageFound,
         decimal damageAmount,
         string conditionNotes)
@@ -227,29 +229,30 @@ public class ServiceController : Controller
 
         if (booking.BookingStatus != "service_review" ||
             booking.CarId is null ||
-            !booking.ReturnMileage.HasValue ||
-            string.IsNullOrWhiteSpace(booking.ReturnImagePaths))
+            !booking.ReturnSubmittedAt.HasValue)
         {
-            return Conflict("รายการนี้ยังไม่ผ่านการรับรถจากพนักงาน");
+            return Conflict("รายการนี้ยังไม่ได้แจ้งส่งคืนรถ");
         }
 
-        var receivedInspection = _db.CarInspections
+        var pickupInspection = _db.CarInspections
             .Where(inspection => inspection.BookingId == bookingId &&
-                inspection.InspectionStage == "return_received")
+                inspection.InspectionStage == "before_pickup")
             .OrderByDescending(inspection => inspection.InspectionId)
             .FirstOrDefault();
         var car = _db.Cars.FirstOrDefault(item => item.CarId == booking.CarId.Value);
-        if (receivedInspection is null || car is null)
+        if (pickupInspection is null || car is null)
         {
-            return Conflict("ไม่พบข้อมูลรับรถจากพนักงาน");
+            return Conflict("ไม่พบข้อมูลรถหรือผลตรวจตอนส่งมอบ");
         }
 
-        if (damageAmount is < 0 or > 99999999m ||
+        if (mileage < pickupInspection.Mileage ||
+            fuelLevel is < 0 or > 100 ||
+            damageAmount is < 0 or > 99999999m ||
             string.IsNullOrWhiteSpace(conditionNotes) ||
             conditionNotes.Length > 2000 ||
             (!damageFound && damageAmount > 0))
         {
-            return BadRequest("กรุณาระบุผลตรวจและค่าซ่อมให้ถูกต้อง");
+            return BadRequest("กรุณาระบุเลขไมล์ น้ำมัน ผลตรวจ และค่าซ่อมให้ถูกต้อง");
         }
 
         _db.CarInspections.Add(new CarInspectionModel
@@ -258,8 +261,8 @@ public class ServiceController : Controller
             CarId = car.CarId,
             InspectionStage = "after_return",
             InspectionStatus = damageFound ? "failed" : "passed",
-            Mileage = receivedInspection.Mileage,
-            FuelLevel = receivedInspection.FuelLevel,
+            Mileage = mileage,
+            FuelLevel = fuelLevel,
             ConditionNotes = conditionNotes.Trim(),
             DamageAmount = damageFound ? damageAmount : 0m,
             InspectedBy = User.Identity?.Name ?? string.Empty,

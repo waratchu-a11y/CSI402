@@ -23,6 +23,13 @@
         .ToDictionary(
             group => group.Key,
             group => group.OrderByDescending(inspection => inspection.InspectionId).First());
+    var bookingsWithOpenMaintenance = _db.MaintenanceRecords
+        .Where(record => record.BookingId.HasValue &&
+            bookingIds.Contains(record.BookingId.Value) &&
+            record.MaintenanceStatus != "completed")
+        .Select(record => record.BookingId!.Value)
+        .Distinct()
+        .ToHashSet();
 }
 
 <div class="bg-primary text-white py-4 shadow-sm mb-5" style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
@@ -80,6 +87,11 @@
                                     .FirstOrDefault();
                                 var depositVerified = bookingPayments.Any(payment =>
                                     payment.PaymentType == "deposit" && payment.PaymentStatus == "verified");
+                                var refundCompleted = bookingPayments.Any(payment =>
+                                    payment.PaymentType == "refund" && payment.PaymentStatus == "completed");
+                                var deductionCompleted = bookingPayments.Any(payment =>
+                                    payment.PaymentType == "deduction" && payment.PaymentStatus == "verified");
+                                var returnRepairOpen = bookingsWithOpenMaintenance.Contains(item.BookingId);
                                 var hasReleaseInspection = latestReleaseInspections.TryGetValue(item.BookingId, out var releaseInspection);
                                 var releasePassed = hasReleaseInspection && releaseInspection!.InspectionStatus == "passed";
                                 var releaseFailed = hasReleaseInspection && releaseInspection!.InspectionStatus == "failed";
@@ -209,11 +221,41 @@
                                         }
                                         else if (item.BookingStatus == "service_review")
                                         {
-                                            <span class="badge badge-motion bg-info text-dark px-3 py-2 rounded-pill">รอทีมช่างตรวจสภาพ</span>
+                                            <span class="badge badge-motion bg-info text-dark px-3 py-2 rounded-pill">รอช่างตรวจสอบคืนรถ</span>
+                                            <div class="alert alert-info py-2 px-3 mt-2 mb-0 small text-start">
+                                                <i class="fa-solid fa-hourglass-half me-1"></i>
+                                                รับแจ้งคืนรถแล้ว ทีมช่างจะตรวจสภาพก่อนส่งเรื่องให้ฝ่ายการเงินคืนเงินมัดจำ
+                                            </div>
                                         }
                                         else if (item.BookingStatus == "completed")
                                         {
                                             <span class="badge badge-motion bg-secondary px-3 py-2 rounded-pill">คืนรถแล้ว</span>
+                                            @if (refundCompleted)
+                                            {
+                                                <div class="alert alert-success py-2 px-3 mt-2 mb-0 small text-start">
+                                                    <i class="fa-solid fa-circle-check me-1"></i>ฝ่ายการเงินคืนเงินมัดจำแล้ว
+                                                </div>
+                                            }
+                                            else if (returnRepairOpen)
+                                            {
+                                                <div class="alert alert-warning py-2 px-3 mt-2 mb-0 small text-start">
+                                                    <i class="fa-solid fa-screwdriver-wrench me-1"></i>
+                                                    ทีมช่างกำลังจัดการความเสียหายก่อนสรุปเงินมัดจำ
+                                                </div>
+                                            }
+                                            else if (depositVerified && !deductionCompleted)
+                                            {
+                                                <div class="alert alert-info py-2 px-3 mt-2 mb-0 small text-start">
+                                                    <i class="fa-solid fa-hourglass-half me-1"></i>
+                                                    ช่างตรวจรถแล้ว ส่งเรื่องให้ฝ่ายการเงินคืนเงินมัดจำ
+                                                </div>
+                                            }
+                                            else if (deductionCompleted)
+                                            {
+                                                <div class="alert alert-info py-2 px-3 mt-2 mb-0 small text-start">
+                                                    ฝ่ายการเงินสรุปการหักค่าซ่อมจากเงินมัดจำแล้ว
+                                                </div>
+                                            }
                                         }
                                         else
                                         {
@@ -263,17 +305,11 @@
                                         @if (item.BookingStatus == "rented")
                                         {
                                             <form asp-controller="Home" asp-action="RequestReturn" method="post"
-                                                  enctype="multipart/form-data" class="mt-2 text-start"
-                                                  onsubmit="return confirm('ยืนยันส่งรูปและเลขไมล์รถคืนให้พนักงานตรวจสอบหรือไม่?');">
+                                                  class="mt-2 text-start"
+                                                  onsubmit="return confirm('ยืนยันส่งรถคืนเพื่อให้ทีมช่างตรวจสอบหรือไม่?');">
                                                 <input type="hidden" name="id" value="@item.BookingId" />
-                                                <label class="form-label small mb-1">เลขไมล์ปัจจุบัน</label>
-                                                <input name="mileage" type="number" min="0" class="form-control form-control-sm mb-2"
-                                                       placeholder="กรอกเลขไมล์บนหน้าปัด" required />
-                                                <label class="form-label small mb-1">รูปถ่ายรถตอนคืน (1-5 รูป, JPG/PNG ไม่เกิน 5 MB/รูป)</label>
-                                                <input name="returnImages" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                                                       class="form-control form-control-sm mb-2" multiple required />
                                                 <button type="submit" class="btn btn-warning btn-sm fw-bold">
-                                                    <i class="fa-solid fa-upload me-1"></i>ส่งข้อมูลคืนรถ
+                                                    <i class="fa-solid fa-car-side me-1"></i>ส่งรถคืน
                                                 </button>
                                             </form>
                                             <span class="d-block small text-muted mt-1">

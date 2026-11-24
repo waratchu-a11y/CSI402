@@ -1,7 +1,11 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
+using System.Security.Claims;
 using warat_0583_l005.Models;
 using warat_0583_l005.Services;
 
@@ -260,6 +264,171 @@ public class ManagementController : Controller
             ? AvailableRoles
             : AvailableRoles.Where(role => role is not ("Admin" or "Manager")).ToArray();
         return View(_db.UserModels.OrderBy(user => user.Username).ToList());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateUserDetails(
+        int userId,
+        string? username,
+        string? email,
+        string? phone,
+        string? gender,
+        string? idCard,
+        string? driverLicense,
+        string? role,
+        bool isActive,
+        string? registerDate)
+    {
+        if (!RoleAccess.HasRole(_db, User, "Admin"))
+        {
+            return Forbid();
+        }
+
+        var target = _db.UserModels.FirstOrDefault(item => item.Id == userId);
+        if (target is null)
+        {
+            return NotFound();
+        }
+
+        string normalizedUsername = username?.Trim() ?? string.Empty;
+        string? normalizedEmail = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+        string? normalizedPhone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
+        string? normalizedGender = string.IsNullOrWhiteSpace(gender) ? null : gender.Trim();
+        string? normalizedIdCard = string.IsNullOrWhiteSpace(idCard) ? null : idCard.Trim();
+        string? normalizedDriverLicense = string.IsNullOrWhiteSpace(driverLicense) ? null : driverLicense.Trim();
+
+        bool isRegisterDateValid = TryParseFormDate(registerDate, out DateTime? parsedRegisterDate);
+        if (normalizedUsername.Length == 0 ||
+            normalizedUsername.Length > 255 ||
+            normalizedEmail?.Length > 255 ||
+            (normalizedEmail is not null && !new EmailAddressAttribute().IsValid(normalizedEmail)) ||
+            normalizedPhone?.Length > 50 ||
+            normalizedGender?.Length > 50 ||
+            normalizedIdCard?.Length > 13 ||
+            normalizedDriverLicense?.Length > 20 ||
+            role is null ||
+            !AvailableRoles.Contains(role) ||
+            !isRegisterDateValid ||
+            !parsedRegisterDate.HasValue ||
+            parsedRegisterDate.Value.Date > DateTime.Today)
+        {
+            TempData["ManagementError"] = "ข้อมูลผู้ใช้ไม่ถูกต้อง";
+            return RedirectToAction(nameof(Users));
+        }
+
+        bool duplicateUsername = _db.UserModels.Any(item =>
+            item.Id != userId && item.Username == normalizedUsername);
+        if (duplicateUsername)
+        {
+            TempData["ManagementError"] = "ชื่อผู้ใช้นี้ถูกใช้แล้ว";
+            return RedirectToAction(nameof(Users));
+        }
+
+        bool isCurrentUser = target.Username == User.Identity?.Name;
+        if (isCurrentUser && (role != "Admin" || !isActive))
+        {
+            TempData["ManagementError"] = "ไม่สามารถปิดใช้งานหรือลดสิทธิ์บัญชีที่กำลังเข้าสู่ระบบ";
+            return RedirectToAction(nameof(Users));
+        }
+
+        if (target.Role == "Admin" && target.IsActive &&
+            (role != "Admin" || !isActive) &&
+            _db.UserModels.Count(item => item.Role == "Admin" && item.IsActive) <= 1)
+        {
+            TempData["ManagementError"] = "ระบบต้องมีบัญชี Admin ที่ใช้งานได้อย่างน้อยหนึ่งบัญชี";
+            return RedirectToAction(nameof(Users));
+        }
+
+        string? previousUsername = target.Username;
+        if (previousUsername != normalizedUsername)
+        {
+            var userBookings = _db.Bookings.Where(booking => booking.UserId == previousUsername).ToList();
+            if (userBookings.Count > 0 && normalizedUsername.Length > 100)
+            {
+                TempData["ManagementError"] = "ชื่อผู้ใช้ต้องไม่เกิน 100 ตัวอักษรเมื่อมีประวัติการจอง";
+                return RedirectToAction(nameof(Users));
+            }
+
+            foreach (var booking in userBookings)
+            {
+                booking.UserId = normalizedUsername;
+            }
+        }
+
+        target.Username = normalizedUsername;
+        target.Email = normalizedEmail;
+        target.Phone = normalizedPhone;
+        target.Gender = normalizedGender;
+        target.IdCard = normalizedIdCard;
+        target.DriverLicense = normalizedDriverLicense;
+        target.Role = role;
+        target.IsActive = isActive;
+        target.RegisterDate = parsedRegisterDate.Value;
+        _db.SaveChanges();
+
+        if (isCurrentUser && previousUsername != normalizedUsername)
+        {
+            var claims = User.Claims
+                .Select(claim => claim.Type == ClaimTypes.Name
+                    ? new Claim(ClaimTypes.Name, normalizedUsername)
+                    : claim)
+                .ToList();
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(identity),
+                new AuthenticationProperties
+                {
+                    IsPersistent = true,
+                    ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
+                });
+
+            Response.Cookies.Append("Username", normalizedUsername, new CookieOptions
+            {
+                Expires = DateTimeOffset.UtcNow.AddHours(8),
+                HttpOnly = true,
+                SameSite = SameSiteMode.Lax,
+                Secure = Request.IsHttps
+            });
+        }
+
+        TempData["ManagementMessage"] = "บันทึกข้อมูลผู้ใช้แล้ว";
+        return RedirectToAction(nameof(Users));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult DeleteUser(int userId)
+    {
+        if (!RoleAccess.HasRole(_db, User, "Admin"))
+        {
+            return Forbid();
+        }
+
+        var target = _db.UserModels.FirstOrDefault(item => item.Id == userId);
+        if (target is null)
+        {
+            return NotFound();
+        }
+
+        if (target.Username == User.Identity?.Name)
+        {
+            TempData["ManagementError"] = "ไม่สามารถลบบัญชีที่กำลังเข้าสู่ระบบ";
+            return RedirectToAction(nameof(Users));
+        }
+
+        if (target.Role == "Admin" && target.IsActive &&
+            _db.UserModels.Count(item => item.Role == "Admin" && item.IsActive) <= 1)
+        {
+            TempData["ManagementError"] = "ไม่สามารถลบ Admin คนสุดท้ายที่กำลังใช้งานได้";
+            return RedirectToAction(nameof(Users));
+        }
+
+        _db.UserModels.Remove(target);
+        _db.SaveChanges();
+        TempData["ManagementMessage"] = $"ลบบัญชี {target.Username} แล้ว";
+        return RedirectToAction(nameof(Users));
     }
 
     [HttpPost]
