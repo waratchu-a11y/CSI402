@@ -32,10 +32,13 @@
         .ToHashSet();
 }
 
-<div class="bg-primary text-white py-4 shadow-sm mb-5" style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
-    <div class="container">
+<div class="page-hero">
+    <div class="container position-relative z-1">
+        <span class="badge bg-warning text-dark rounded-pill px-3 py-1 mb-2 fw-semibold">
+            <i class="fa-solid fa-receipt me-1"></i> ติดตามสถานะการเดินทาง
+        </span>
         <h2 class="fw-bold mb-1"><i class="fa-solid fa-clock-rotate-left me-2"></i> ประวัติการจองของฉัน</h2>
-        <p class="text-white-50 m-0">ตรวจสอบรายการจองรถและสถานะการเดินทางของคุณได้ที่นี่</p>
+        <p class="text-white-50 m-0">ตรวจสอบรายการจองรถ ชำระเงิน และสถานะการเดินทางของคุณได้ที่นี่</p>
     </div>
 </div>
 
@@ -159,6 +162,17 @@
                                     <td data-label="จำนวนวัน">@item.RentalDays วัน</td>
                                     <td class="fw-bold text-primary" data-label="ราคารวม">฿@item.TotalPrice.ToString("N0")</td>
                                     <td class="text-center" data-label="สถานะ">
+                                        @{
+                                            int stepIndex = item.BookingStatus switch
+                                            {
+                                                "pending_payment" or "payment_rejected" or "payment_review" => 1,
+                                                "confirmed" => readyForHandover ? 3 : 2,
+                                                "rented" or "return_requested" or "service_review" => 4,
+                                                "completed" => 5,
+                                                _ => 0
+                                            };
+                                            bool isRejectedOrCancelled = item.BookingStatus is "payment_rejected" or "cancelled";
+                                        }
                                         @if (item.BookingStatus == "pending_payment")
                                         {
                                             <span class="badge badge-motion bg-warning text-dark px-3 py-2 rounded-pill">รอชำระมัดจำ</span>
@@ -261,6 +275,25 @@
                                         {
                                             <span class="badge badge-motion bg-secondary px-3 py-2 rounded-pill">@item.BookingStatus</span>
                                         }
+                                        @if (stepIndex > 0)
+                                        {
+                                            <div class="booking-stepper" title="ความคืบหน้าการจอง (@stepIndex/5)">
+                                                @for (int s = 1; s <= 5; s++)
+                                                {
+                                                    var dotClass = isRejectedOrCancelled && s == stepIndex
+                                                        ? "is-error"
+                                                        : s < stepIndex || stepIndex == 5
+                                                            ? "is-done"
+                                                            : s == stepIndex
+                                                                ? "is-current"
+                                                                : "";
+                                                    <span class="booking-step-dot @dotClass"></span>
+                                                }
+                                            </div>
+                                            <div class="d-flex justify-content-between text-muted mt-1" style="font-size: .68rem;">
+                                                <span>จอง</span><span>มัดจำ</span><span>เตรียมรถ</span><span>เช่า</span><span>คืน</span>
+                                            </div>
+                                        }
                                         @if (item.BookingStatus == "confirmed")
                                         {
                                             <span class="d-block small mt-1">ค่าเช่าคงเหลือ ฿@rentalRemaining.ToString("N2")</span>
@@ -304,17 +337,77 @@
                                         }
                                         @if (item.BookingStatus == "rented")
                                         {
-                                            <form asp-controller="Home" asp-action="RequestReturn" method="post"
-                                                  class="mt-2 text-start"
-                                                  onsubmit="return confirm('ยืนยันส่งรถคืนเพื่อให้ทีมช่างตรวจสอบหรือไม่?');">
-                                                <input type="hidden" name="id" value="@item.BookingId" />
-                                                <button type="submit" class="btn btn-warning btn-sm fw-bold">
-                                                    <i class="fa-solid fa-car-side me-1"></i>ส่งรถคืน
-                                                </button>
-                                            </form>
+                                            <button type="button"
+                                                    class="btn btn-warning btn-sm fw-bold mt-2"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#returnRefundModal-@item.BookingId">
+                                                <i class="fa-solid fa-car-side me-1"></i>ส่งรถคืน
+                                            </button>
                                             <span class="d-block small text-muted mt-1">
                                                 คืนที่ @item.ReturnLocation วันที่ @item.ReturnDate?.ToString("yyyy-MM-dd") @item.ReturnTime
                                             </span>
+
+                                            <div class="modal fade" id="returnRefundModal-@item.BookingId" tabindex="-1" aria-hidden="true">
+                                                <div class="modal-dialog modal-dialog-centered">
+                                                    <div class="modal-content border-0 shadow">
+                                                        <div class="modal-header text-white border-0" style="background: linear-gradient(135deg, #1d4ed8, #2563eb);">
+                                                            <h5 class="modal-title fw-bold">
+                                                                <i class="fa-solid fa-university me-2"></i>ข้อมูลบัญชีสำหรับรับเงินมัดจำคืน
+                                                            </h5>
+                                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="ปิด"></button>
+                                                        </div>
+                                                        <form asp-controller="Home" asp-action="RequestReturn" method="post"
+                                                              onsubmit="return confirm('ยืนยันส่งรถคืนและข้อมูลบัญชีให้ฝ่ายการเงินหรือไม่?');">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="id" value="@item.BookingId" />
+                                                            <div class="modal-body p-4">
+                                                                <p class="text-muted small mb-3">
+                                                                    กรุณากรอกข้อมูลให้ถูกต้องเพื่อให้ฝ่ายการเงินโอนเงินมัดจำคืนตามรายละเอียดการจอง
+                                                                    <strong>#BK-@item.BookingId</strong>
+                                                                </p>
+                                                                <div class="mb-3">
+                                                                    <label class="form-label fw-bold" for="refundBankName-@item.BookingId">ธนาคาร</label>
+                                                                    <select class="form-select" id="refundBankName-@item.BookingId" name="refundBankName" required>
+                                                                        <option value="" selected disabled>กรุณาเลือกธนาคาร</option>
+                                                                        <option>ธนาคารกรุงเทพ</option>
+                                                                        <option>ธนาคารกสิกรไทย</option>
+                                                                        <option>ธนาคารกรุงไทย</option>
+                                                                        <option>ธนาคารไทยพาณิชย์</option>
+                                                                        <option>ธนาคารกรุงศรีอยุธยา</option>
+                                                                        <option>ธนาคารทหารไทยธนชาต</option>
+                                                                        <option>ธนาคารออมสิน</option>
+                                                                        <option>ธนาคารเพื่อการเกษตรและสหกรณ์การเกษตร</option>
+                                                                        <option>ธนาคารอื่น</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div class="mb-3">
+                                                                    <label class="form-label fw-bold" for="refundAccountName-@item.BookingId">ชื่อ-นามสกุลเจ้าของบัญชี</label>
+                                                                    <input class="form-control" id="refundAccountName-@item.BookingId"
+                                                                           name="refundAccountName" maxlength="150" placeholder="ชื่อ-นามสกุลเจ้าของบัญชี" required />
+                                                                </div>
+                                                                <div class="mb-3">
+                                                                    <label class="form-label fw-bold" for="refundAccountNumber-@item.BookingId">เลขบัญชี</label>
+                                                                    <input class="form-control" id="refundAccountNumber-@item.BookingId"
+                                                                           name="refundAccountNumber" maxlength="30" inputmode="numeric"
+                                                                           pattern="[0-9]+" placeholder="กรอกเฉพาะตัวเลข" required />
+                                                                </div>
+                                                                <div>
+                                                                    <label class="form-label fw-bold" for="refundPhone-@item.BookingId">เบอร์โทรศัพท์ (สำหรับติดต่อ)</label>
+                                                                    <input class="form-control" id="refundPhone-@item.BookingId"
+                                                                           name="refundPhone" maxlength="20" inputmode="tel"
+                                                                           placeholder="08X-XXX-XXXX" required />
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer border-0">
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                                                                <button type="submit" class="btn btn-warning fw-bold">
+                                                                    <i class="fa-solid fa-paper-plane me-1"></i>ยืนยันส่งข้อมูลคืนรถ
+                                                                </button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         }
                                     </td>
                                 </tr>

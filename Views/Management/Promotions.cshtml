@@ -4,55 +4,93 @@
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
 }
 
-<div class="container my-5">
-    <h2 class="fw-bold mb-3">จัดการโปรโมชั่น</h2>
+<div class="container py-4 py-lg-5">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div>
+            <h1 class="h2 fw-bold mb-1"><i class="fa-solid fa-percent text-danger me-2"></i>จัดการโปรโมชั่น</h1>
+            <p class="text-muted mb-0">สร้าง แก้ไข และเปิด-ปิดแคมเปญส่วนลดสำหรับลูกค้า</p>
+        </div>
+        <a asp-action="Index" class="btn btn-outline-secondary rounded-pill px-3">
+            <i class="fa-solid fa-arrow-left me-1"></i>กลับภาพรวม
+        </a>
+    </div>
+
     @if (TempData["ManagementMessage"] is string message) { <div class="alert alert-success">@message</div> }
     @if (TempData["ManagementError"] is string error) { <div class="alert alert-danger">@error</div> }
-    <div class="card mb-4"><div class="card-header fw-bold">เพิ่มโปรโมชั่น</div><div class="card-body">
-        <form asp-action="SavePromotion" method="post" class="row g-3">
-            <div class="col-md-3"><label class="form-label">ชื่อ</label><input name="promotionName" maxlength="150" class="form-control" required /></div>
-            <div class="col-md-2"><label class="form-label">รหัส (เว้นว่าง=อัตโนมัติ)</label><input name="promotionCode" maxlength="50" class="form-control" /></div>
-            <div class="col-md-2"><label class="form-label">เงื่อนไข</label><select name="conditionType" class="form-select"><option value="custom">ทั่วไป</option><option value="new_user">ลูกค้าใหม่</option><option value="3_days">เช่า 3 วันขึ้นไป</option><option value="7_days">เช่า 7 วันขึ้นไป</option><option value="weekday">จันทร์-พฤหัสฯ</option><option value="festival">เทศกาล</option></select></div>
-            <div class="col-md-1"><label class="form-label">ลด %</label><input name="discountPercent" type="number" min="0.01" max="100" step="0.01" class="form-control" required /></div>
-            <div class="col-md-2"><label class="form-label">เริ่มวันที่</label><input name="startDate" type="date" class="form-control" /></div>
-            <div class="col-md-2"><label class="form-label">ถึงวันที่</label><input name="endDate" type="date" class="form-control" /></div>
-            <div class="col-12"><button class="btn btn-primary">เพิ่มโปรโมชั่น</button></div>
-        </form>
-    </div></div>
-    <div class="table-responsive"><table class="table align-middle">
-        <thead><tr><th>ชื่อ</th><th>รหัส</th><th>ประเภทเงื่อนไข</th><th>ส่วนลด</th><th>ช่วงวัน</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
-        <tbody>
-        @foreach (var promotion in Model)
-        {
-            <tr>
-                <td><input form="promotion-@promotion.PromotionId" name="promotionName" value="@promotion.PromotionName" maxlength="150" class="form-control form-control-sm" required /></td>
-                <td><input form="promotion-@promotion.PromotionId" name="promotionCode" value="@promotion.PromotionCode" maxlength="50" class="form-control form-control-sm" /></td>
-                <td>
-                    <select form="promotion-@promotion.PromotionId" name="conditionType" class="form-select form-select-sm">
-                        <option value="custom" selected="@(promotion.ConditionType == "custom")">ทั่วไป</option>
-                        <option value="new_user" selected="@(promotion.ConditionType == "new_user")">ลูกค้าใหม่</option>
-                        <option value="3_days" selected="@(promotion.ConditionType == "3_days")">3 วันขึ้นไป</option>
-                        <option value="7_days" selected="@(promotion.ConditionType == "7_days")">7 วันขึ้นไป</option>
-                        <option value="weekday" selected="@(promotion.ConditionType == "weekday")">จันทร์-พฤหัสฯ</option>
-                        <option value="festival" selected="@(promotion.ConditionType == "festival")">เทศกาล</option>
-                    </select>
-                </td>
-                <td><input form="promotion-@promotion.PromotionId" name="discountPercent" type="number" min="0.01" max="100" step="0.01" value="@promotion.DiscountPercent" class="form-control form-control-sm" required /></td>
-                <td>
-                    <input form="promotion-@promotion.PromotionId" name="startDate" type="date" value="@promotion.StartDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm mb-1" />
-                    <input form="promotion-@promotion.PromotionId" name="endDate" type="date" value="@promotion.EndDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm" />
-                </td>
-                <td>@(promotion.IsActive ? "ใช้งาน" : "ปิด")</td>
-                <td class="text-nowrap">
-                    <form id="promotion-@promotion.PromotionId" asp-action="SavePromotion" method="post">
-                        <input type="hidden" name="promotionId" value="@promotion.PromotionId" />
-                        <input type="hidden" name="isActive" value="@promotion.IsActive" />
-                        <button class="btn btn-sm btn-primary mb-1">บันทึก</button>
-                    </form>
-                    <form asp-action="TogglePromotion" method="post"><input type="hidden" name="promotionId" value="@promotion.PromotionId" /><button class="btn btn-sm btn-outline-secondary">@(promotion.IsActive ? "ปิด" : "เปิด")</button></form>
-                </td>
-            </tr>
-        }
-        </tbody>
-    </table></div>
+
+    <div class="card mb-4">
+        <div class="card-header fw-bold"><i class="fa-solid fa-plus-circle text-primary me-2"></i>เพิ่มโปรโมชั่นใหม่</div>
+        <div class="card-body p-4">
+            <form asp-action="SavePromotion" method="post" class="row g-3">
+                <div class="col-md-3"><label class="form-label small">ชื่อโปรโมชั่น</label><input name="promotionName" maxlength="150" class="form-control" required /></div>
+                <div class="col-md-2"><label class="form-label small">รหัส (เว้นว่าง=อัตโนมัติ)</label><input name="promotionCode" maxlength="50" class="form-control" /></div>
+                <div class="col-md-2"><label class="form-label small">เงื่อนไข</label><select name="conditionType" class="form-select"><option value="custom">ทั่วไป</option><option value="new_user">ลูกค้าใหม่</option><option value="3_days">เช่า 3 วันขึ้นไป</option><option value="7_days">เช่า 7 วันขึ้นไป</option><option value="weekday">จันทร์-พฤหัสฯ</option><option value="festival">เทศกาล</option></select></div>
+                <div class="col-md-1"><label class="form-label small">ลด %</label><input name="discountPercent" type="number" min="0.01" max="100" step="0.01" class="form-control" required /></div>
+                <div class="col-md-2"><label class="form-label small">เริ่มวันที่</label><input name="startDate" type="date" class="form-control" /></div>
+                <div class="col-md-2"><label class="form-label small">ถึงวันที่</label><input name="endDate" type="date" class="form-control" /></div>
+                <div class="col-12"><button class="btn btn-primary px-4"><i class="fa-solid fa-plus me-1"></i>เพิ่มโปรโมชั่น</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header fw-bold"><i class="fa-solid fa-tags text-primary me-2"></i>รายการโปรโมชั่นทั้งหมด (@Model.Count())</div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="px-4">ชื่อ</th>
+                            <th>รหัส</th>
+                            <th>ประเภทเงื่อนไข</th>
+                            <th>ส่วนลด</th>
+                            <th>ช่วงวัน</th>
+                            <th>สถานะ</th>
+                            <th class="pe-4">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var promotion in Model)
+                    {
+                        <tr>
+                            <td class="px-4"><input form="promotion-@promotion.PromotionId" name="promotionName" value="@promotion.PromotionName" maxlength="150" class="form-control form-control-sm" required /></td>
+                            <td><input form="promotion-@promotion.PromotionId" name="promotionCode" value="@promotion.PromotionCode" maxlength="50" class="form-control form-control-sm" /></td>
+                            <td>
+                                <select form="promotion-@promotion.PromotionId" name="conditionType" class="form-select form-select-sm">
+                                    <option value="custom" selected="@(promotion.ConditionType == "custom")">ทั่วไป</option>
+                                    <option value="new_user" selected="@(promotion.ConditionType == "new_user")">ลูกค้าใหม่</option>
+                                    <option value="3_days" selected="@(promotion.ConditionType == "3_days")">3 วันขึ้นไป</option>
+                                    <option value="7_days" selected="@(promotion.ConditionType == "7_days")">7 วันขึ้นไป</option>
+                                    <option value="weekday" selected="@(promotion.ConditionType == "weekday")">จันทร์-พฤหัสฯ</option>
+                                    <option value="festival" selected="@(promotion.ConditionType == "festival")">เทศกาล</option>
+                                </select>
+                            </td>
+                            <td style="width: 100px;"><input form="promotion-@promotion.PromotionId" name="discountPercent" type="number" min="0.01" max="100" step="0.01" value="@promotion.DiscountPercent" class="form-control form-control-sm" required /></td>
+                            <td>
+                                <input form="promotion-@promotion.PromotionId" name="startDate" type="date" value="@promotion.StartDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm mb-1" />
+                                <input form="promotion-@promotion.PromotionId" name="endDate" type="date" value="@promotion.EndDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm" />
+                            </td>
+                            <td>
+                                <span class="badge @(promotion.IsActive ? "bg-success-subtle text-success" : "bg-secondary-subtle text-secondary") rounded-pill">
+                                    @(promotion.IsActive ? "ใช้งาน" : "ปิด")
+                                </span>
+                            </td>
+                            <td class="text-nowrap pe-4">
+                                <form id="promotion-@promotion.PromotionId" asp-action="SavePromotion" method="post" class="d-inline">
+                                    <input type="hidden" name="promotionId" value="@promotion.PromotionId" />
+                                    <input type="hidden" name="isActive" value="@promotion.IsActive" />
+                                    <button class="btn btn-sm btn-primary mb-1"><i class="fa-solid fa-floppy-disk me-1"></i>บันทึก</button>
+                                </form>
+                                <form asp-action="TogglePromotion" method="post" class="d-inline">
+                                    <input type="hidden" name="promotionId" value="@promotion.PromotionId" />
+                                    <button class="btn btn-sm btn-outline-secondary mb-1">@(promotion.IsActive ? "ปิด" : "เปิด")</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>

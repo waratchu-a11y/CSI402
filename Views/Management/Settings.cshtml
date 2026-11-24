@@ -4,19 +4,50 @@
     var settings = (Dictionary<string, string>)ViewBag.Settings;
 }
 
-<div class="container my-5">
-    <h2 class="fw-bold mb-3">ตั้งค่าบัญชีรับโอน</h2>
-    @if (TempData["ManagementMessage"] is string message) { <div class="alert alert-success">@message</div> }
-    <div class="alert alert-warning">ลูกค้าจะเห็นข้อมูลบัญชีและ QR PromptPay นี้ในขั้นตอนชำระเงิน โปรดตรวจสอบความถูกต้องก่อนเปิดใช้งาน</div>
-    <form asp-action="SaveBankSettings" method="post" class="card card-body shadow-sm">
-        <div class="mb-3"><label class="form-label">ธนาคาร</label><input name="bankName" value="@settings.GetValueOrDefault("BankName")" maxlength="100" class="form-control" /></div>
-        <div class="mb-3"><label class="form-label">เลขบัญชี</label><input name="bankAccount" value="@settings.GetValueOrDefault("BankAccount")" maxlength="100" class="form-control" /></div>
-        <div class="mb-3"><label class="form-label">ชื่อบัญชี</label><input name="bankAccountName" value="@settings.GetValueOrDefault("BankAccountName")" maxlength="150" class="form-control" /></div>
-        <div class="mb-3">
-            <label class="form-label">เบอร์ PromptPay สำหรับสร้าง QR ระบุยอด</label>
-            <input name="promptPayId" value="@settings.GetValueOrDefault("PromptPayId")" inputmode="numeric" pattern="0[0-9]{9}" maxlength="10" class="form-control" placeholder="0XXXXXXXXX" />
-            <div class="form-text">รองรับเบอร์มือถือ PromptPay 10 หลัก หากไม่กรอก ระบบจะให้โอนเข้าบัญชีและแนบสลิปตามปกติ</div>
+<div class="container py-4 py-lg-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div>
+                    <h1 class="h2 fw-bold mb-1"><i class="fa-solid fa-building-columns text-primary me-2"></i>ตั้งค่าบัญชีรับโอน</h1>
+                    <p class="text-muted mb-0">กำหนดข้อมูลธนาคารและ PromptPay สำหรับรับชำระเงินจากลูกค้า</p>
+                </div>
+                <a asp-action="Index" class="btn btn-outline-secondary rounded-pill px-3">
+                    <i class="fa-solid fa-arrow-left me-1"></i>กลับภาพรวม
+                </a>
+            </div>
+
+            @if (TempData["ManagementMessage"] is string message) { <div class="alert alert-success">@message</div> }
+            <div class="alert alert-warning mb-4">
+                <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                ลูกค้าจะเห็นข้อมูลบัญชีและ QR PromptPay นี้ในขั้นตอนชำระเงิน โปรดตรวจสอบความถูกต้องก่อนเปิดใช้งาน
+            </div>
+
+            <div class="card">
+                <div class="card-header fw-bold"><i class="fa-solid fa-qrcode text-primary me-2"></i>ข้อมูลบัญชีธนาคารและ PromptPay</div>
+                <div class="card-body p-4">
+                    <form asp-action="SaveBankSettings" method="post">
+                        <div class="mb-3">
+                            <label class="form-label">ธนาคาร</label>
+                            <input name="bankName" value="@settings.GetValueOrDefault("BankName")" maxlength="100" class="form-control" placeholder="เช่น ธนาคารกสิกรไทย" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">เลขบัญชี</label>
+                            <input name="bankAccount" value="@settings.GetValueOrDefault("BankAccount")" maxlength="100" class="form-control" placeholder="XXX-X-XXXXX-X" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">ชื่อบัญชี</label>
+                            <input name="bankAccountName" value="@settings.GetValueOrDefault("BankAccountName")" maxlength="150" class="form-control" placeholder="ชื่อ-นามสกุล หรือ ชื่อบริษัท" />
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">เบอร์ PromptPay สำหรับสร้าง QR ระบุยอด</label>
+                            <input name="promptPayId" value="@settings.GetValueOrDefault("PromptPayId")" inputmode="numeric" pattern="0[0-9]{9}" maxlength="10" class="form-control" placeholder="0XXXXXXXXX" />
+                            <div class="form-text">รองรับเบอร์มือถือ PromptPay 10 หลัก หากไม่กรอก ระบบจะให้โอนเข้าบัญชีและแนบสลิปตามปกติ</div>
+                        </div>
+                        <button class="btn btn-primary px-4"><i class="fa-solid fa-floppy-disk me-1"></i>บันทึกการตั้งค่า</button>
+                    </form>
+                </div>
+            </div>
         </div>
-        <button class="btn btn-primary">บันทึก</button>
-    </form>
+    </div>
 </div>

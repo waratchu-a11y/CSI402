@@ -1,4 +1,4 @@
-﻿@model IEnumerable<warat_0583_l005.Models.CarModel>
+@model IEnumerable<warat_0583_l005.Models.CarModel>
 @using warat_0583_l005.Models
 @using System.Globalization
 @{
@@ -12,10 +12,12 @@
 }
 
 <!-- ส่วน Hero Banner และ ฟอร์มค้นหา -->
-<div class="hero-section text-white py-5 mb-5 shadow" style="border-radius: 0 0 40px 40px; margin-top: -16px; background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); position: relative; overflow: hidden;">
+<div class="hero-section text-white py-5 mb-5 shadow" style="margin-top: -1px;">
+    <div class="hero-grid-overlay" aria-hidden="true"></div>
+    <div class="hero-light-beam" aria-hidden="true"></div>
     <!-- วงกลมตกแต่งพื้นหลังเพิ่มมิติ -->
-    <div class="position-absolute" style="top: -50px; right: -50px; width: 250px; height: 250px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
-    <div class="position-absolute" style="bottom: -80px; left: -50px; width: 300px; height: 300px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
+    <div class="position-absolute hero-orb" style="top: -70px; right: -60px; width: 320px; height: 320px; background: rgba(255,255,255,0.08); border-radius: 50%; pointer-events: none;"></div>
+    <div class="position-absolute hero-orb hero-orb-delay" style="bottom: -100px; left: -60px; width: 360px; height: 360px; background: rgba(255,255,255,0.04); border-radius: 50%; pointer-events: none;"></div>
 
     <div class="container text-center mt-4 position-relative z-1">
         <span class="badge badge-motion bg-warning text-dark px-3 py-2 rounded-pill fw-bold mb-3 shadow-sm">
@@ -57,6 +59,13 @@
                     </div>
                 </div>
             </form>
+        </div>
+
+        <div class="d-flex justify-content-center flex-wrap gap-2 mt-4">
+            <span class="trust-pill"><i class="fa-solid fa-shield-halved text-warning"></i> ประกันภัยชั้น 1 ทุกคัน</span>
+            <span class="trust-pill"><i class="fa-solid fa-screwdriver-wrench text-warning"></i> ตรวจสภาพก่อนส่งมอบ</span>
+            <span class="trust-pill"><i class="fa-solid fa-qrcode text-warning"></i> จ่ายมัดจำ 10% ผ่าน PromptPay</span>
+            <span class="trust-pill"><i class="fa-solid fa-headset text-warning"></i> ดูแลตลอด 24 ชม.</span>
         </div>
     </div>
 </div>
@@ -136,7 +145,9 @@
                             <div class="promo-card-footer">
                                 @if (!string.IsNullOrWhiteSpace(promotion.PromotionCode))
                                 {
-                                    <span class="promo-code"><i class="fa-solid fa-tag me-1"></i>@promotion.PromotionCode</span>
+                                    <button type="button" class="btn btn-sm btn-light bg-white bg-opacity-25 text-white border border-white border-opacity-50 fw-semibold" data-copy-code="@promotion.PromotionCode" title="คลิกเพื่อคัดลอกโค้ด">
+                                        <i class="fa-solid fa-copy me-1"></i>@promotion.PromotionCode
+                                    </button>
                                 }
                                 else
                                 {
@@ -184,7 +195,7 @@ else
         <a href="~/Home/AllCars" class="text-decoration-none fw-bold text-primary view-all-link">ดูรถทั้งหมด <i class="fa-solid fa-arrow-right ms-1"></i></a>
     </div>
 
-    <div class="row g-4">
+    <div class="row g-4" data-reveal>
         @if (Model != null && Model.Any())
         {
             foreach (var car in Model)
@@ -247,6 +258,46 @@ else
         }
     </div>
 </div>
+
+<!-- ส่วนขั้นตอนการเช่ารถ 3 ขั้นตอน -->
+<section class="container mb-5" data-reveal>
+    <div class="text-center mb-4">
+        <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-2 mb-2 fw-semibold">
+            <i class="fa-solid fa-route me-1"></i> ขั้นตอนง่ายๆ
+        </span>
+        <h2 class="fw-bold mb-1">เช่ารถกับ DriverRent ใน 3 ขั้นตอน</h2>
+        <p class="text-muted mb-0">วางแผนการเดินทางได้ไว โปร่งใส ตรวจสอบสถานะได้ทุกขั้นตอน</p>
+    </div>
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="step-card p-4 h-100">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <span class="step-number">1</span>
+                    <h5 class="fw-bold mb-0">เลือกรถและวันเดินทาง</h5>
+                </div>
+                <p class="text-muted small mb-0">ค้นหารถว่างตามจุดรับรถและวันที่ต้องการ พร้อมดูราคาและบริการเสริมได้ทันที</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="step-card p-4 h-100">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <span class="step-number">2</span>
+                    <h5 class="fw-bold mb-0">โอนมัดจำ 10% &amp; แนบสลิป</h5>
+                </div>
+                <p class="text-muted small mb-0">สแกน QR PromptPay ที่ระบุยอดอัตโนมัติ และอัปโหลดสลิปให้ฝ่ายการเงินตรวจสอบ</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="step-card p-4 h-100">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <span class="step-number">3</span>
+                    <h5 class="fw-bold mb-0">ตรวจสภาพ &amp; ออกเดินทาง</h5>
+                </div>
+                <p class="text-muted small mb-0">ทีมเซอร์วิสตรวจความพร้อมรถและพนักงานส่งมอบรถให้คุณออกเดินทางได้อย่างมั่นใจ</p>
+            </div>
+        </div>
+    </div>
+</section>
 
 <script>
     window.addEventListener('DOMContentLoaded', () => {

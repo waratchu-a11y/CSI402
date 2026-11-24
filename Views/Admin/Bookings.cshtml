@@ -78,16 +78,26 @@
 
     <section class="card">
         <div class="card-header bg-white border-0 px-4 pt-4">
-            <h2 class="h5 fw-bold mb-0">
-                @if (string.IsNullOrWhiteSpace(selectedUserId))
-                {
-                    <span>รายการจองทั้งหมด (@Model.Count())</span>
-                }
-                else
-                {
-                    <span>รายการจองของ @selectedUserId (@Model.Count())</span>
-                }
-            </h2>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <h2 class="h5 fw-bold mb-0">
+                    @if (string.IsNullOrWhiteSpace(selectedUserId))
+                    {
+                        <span>รายการจองทั้งหมด (<span id="bookingVisibleCount">@Model.Count()</span>)</span>
+                    }
+                    else
+                    {
+                        <span>รายการจองของ @selectedUserId (<span id="bookingVisibleCount">@Model.Count()</span>)</span>
+                    }
+                </h2>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <input type="text" id="bookingQuickSearch" class="form-control form-control-sm" style="width: 210px;" placeholder="ค้นหา #BK, ลูกค้า, รถ..." oninput="filterAdminBookings()" />
+                    <button type="button" class="filter-pill active" data-booking-filter="all" onclick="setBookingFilter(this, 'all')">ทั้งหมด</button>
+                    <button type="button" class="filter-pill" data-booking-filter="payment" onclick="setBookingFilter(this, 'payment')">รอชำระ/สลิป</button>
+                    <button type="button" class="filter-pill" data-booking-filter="confirmed" onclick="setBookingFilter(this, 'confirmed')">ยืนยันแล้ว</button>
+                    <button type="button" class="filter-pill" data-booking-filter="active" onclick="setBookingFilter(this, 'active')">กำลังเช่า/คืนรถ</button>
+                    <button type="button" class="filter-pill" data-booking-filter="done" onclick="setBookingFilter(this, 'done')">เสร็จสิ้น/ยกเลิก</button>
+                </div>
+            </div>
         </div>
         <div class="card-body p-0 mt-3">
             <div class="table-responsive">
@@ -109,7 +119,17 @@
                             customerNames.TryGetValue(booking.UserId, out var customerName);
                             verifiedPayments.TryGetValue(booking.BookingId, out var paidAmount);
                             workflowSteps.TryGetValue(booking.BookingId, out var workflowStep);
-                            <tr>
+                            var statusGroup = booking.BookingStatus switch
+                            {
+                                "pending" or "pending_payment" or "payment_review" or "payment_rejected" => "payment",
+                                "confirmed" => "confirmed",
+                                "rented" or "return_requested" or "service_review" => "active",
+                                "completed" or "cancelled" => "done",
+                                _ => "all"
+                            };
+                            <tr class="admin-booking-row"
+                                data-status-group="@statusGroup"
+                                data-search="@($"#bk-{booking.BookingId} {booking.BookingId} {booking.UserId} {customerName} {booking.CarModel}".ToLowerInvariant())">
                                 <td class="px-4" data-label="รหัส / ลูกค้า">
                                     <strong>#BK-@booking.BookingId</strong>
                                     <span class="d-block text-muted small">@(customerName ?? booking.UserId)</span>
@@ -146,7 +166,7 @@
                                     @if (cancellableBookingIds.Contains(booking.BookingId))
                                     {
                                         <form asp-action="CancelBooking" method="post" class="d-inline"
-                                              onsubmit="return confirm('ยืนยันยกเลิกรายการจอง #BK-@booking.BookingId หรือไม่?');">
+                                              data-confirm="ยืนยันยกเลิกรายการจอง #BK-@booking.BookingId หรือไม่?">
                                             <input type="hidden" name="id" value="@booking.BookingId" />
                                             <button type="submit" class="btn btn-sm btn-outline-danger">
                                                 <i class="fa-solid fa-ban me-1"></i>ยกเลิก
@@ -170,3 +190,30 @@
         </div>
     </section>
 </div>
+
+@section Scripts {
+    <script>
+        let currentBookingFilter = 'all';
+
+        function setBookingFilter(btn, group) {
+            currentBookingFilter = group;
+            document.querySelectorAll('[data-booking-filter]').forEach(el => el.classList.remove('active'));
+            btn.classList.add('active');
+            filterAdminBookings();
+        }
+
+        function filterAdminBookings() {
+            const query = (document.getElementById('bookingQuickSearch')?.value || '').trim().toLowerCase();
+            let visible = 0;
+            document.querySelectorAll('.admin-booking-row').forEach(row => {
+                const group = row.getAttribute('data-status-group') || '';
+                const text = row.getAttribute('data-search') || '';
+                const show = (currentBookingFilter === 'all' || group === currentBookingFilter) && (!query || text.includes(query));
+                row.classList.toggle('d-none', !show);
+                if (show) visible++;
+            });
+            const countEl = document.getElementById('bookingVisibleCount');
+            if (countEl) countEl.textContent = visible;
+        }
+    </script>
+}

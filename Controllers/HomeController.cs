@@ -184,7 +184,12 @@ public class HomeController : Controller
     [Authorize]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RequestReturn(int id)
+    public async Task<IActionResult> RequestReturn(
+        int id,
+        string refundBankName,
+        string refundAccountName,
+        string refundAccountNumber,
+        string refundPhone)
     {
         if (!RoleAccess.HasRole(_db, User, "Customer"))
         {
@@ -210,6 +215,25 @@ public class HomeController : Controller
             return Conflict("แจ้งคืนรถได้เฉพาะรายการที่กำลังเช่า");
         }
 
+        refundBankName = refundBankName?.Trim() ?? "";
+        refundAccountName = refundAccountName?.Trim() ?? "";
+        refundAccountNumber = refundAccountNumber?.Trim() ?? "";
+        refundPhone = refundPhone?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(refundBankName) || refundBankName.Length > 100 ||
+            string.IsNullOrWhiteSpace(refundAccountName) || refundAccountName.Length > 150 ||
+            string.IsNullOrWhiteSpace(refundAccountNumber) || refundAccountNumber.Length > 30 ||
+            string.IsNullOrWhiteSpace(refundPhone) || refundPhone.Length > 20)
+        {
+            TempData["PaymentMessage"] = "กรุณากรอกข้อมูลธนาคาร ชื่อบัญชี เลขบัญชี และเบอร์โทรศัพท์ให้ครบถ้วน";
+            return RedirectToAction(nameof(MyBookings));
+        }
+        if (!refundAccountNumber.All(char.IsDigit) ||
+            refundPhone.Any(character => !char.IsDigit(character) && character != '-' && character != ' '))
+        {
+            TempData["PaymentMessage"] = "กรุณากรอกเลขบัญชีเป็นตัวเลข และเบอร์โทรศัพท์ให้ถูกต้อง";
+            return RedirectToAction(nameof(MyBookings));
+        }
+
         var car = booking.CarId.HasValue
             ? await _db.Cars.FirstOrDefaultAsync(item => item.CarId == booking.CarId.Value, HttpContext.RequestAborted)
             : null;
@@ -219,6 +243,10 @@ public class HomeController : Controller
         }
 
         booking.ReturnSubmittedAt = DateTime.Now;
+        booking.RefundBankName = refundBankName;
+        booking.RefundAccountName = refundAccountName;
+        booking.RefundAccountNumber = refundAccountNumber;
+        booking.RefundPhone = refundPhone;
         booking.BookingStatus = "service_review";
         car.Status = "รอตรวจสภาพ";
         await _db.SaveChangesAsync(HttpContext.RequestAborted);

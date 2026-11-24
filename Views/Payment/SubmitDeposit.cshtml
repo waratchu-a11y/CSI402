@@ -7,10 +7,11 @@
 <div class="container my-5">
     <div class="row justify-content-center">
         <div class="col-lg-7">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-primary text-white p-4">
-                    <h3 class="fw-bold mb-1">ชำระเงินมัดจำด้วยการโอน</h3>
-                    <p class="mb-0">การจอง #@Model.BookingId — รอตรวจสอบหลังส่งหลักฐาน</p>
+            <div class="card shadow-lg border-0 overflow-hidden">
+                <div class="card-header text-white p-4 border-0" style="background: var(--dr-gradient-brand);">
+                    <span class="badge bg-warning text-dark rounded-pill px-3 py-1 mb-2 fw-semibold">ขั้นตอนการชำระเงินมัดจำ</span>
+                    <h3 class="fw-bold mb-1"><i class="fa-solid fa-money-bill-transfer me-2"></i>ชำระเงินมัดจำด้วยการโอน</h3>
+                    <p class="mb-0 text-white-50">การจอง #@Model.BookingId — รอตรวจสอบหลังส่งหลักฐาน</p>
                 </div>
                 <div class="card-body p-4">
                     @if (ViewBag.RejectedPayment is warat_0583_l005.Models.PaymentModel rejected)
@@ -55,8 +56,15 @@
                         </div>
                         <div class="mb-4">
                             <label class="form-label fw-bold" for="proofFile">รูปสลิปโอนเงิน <span class="text-danger">*</span></label>
-                            <input id="proofFile" name="proofFile" type="file" class="form-control" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
-                            <div class="form-text">JPG/PNG ไม่เกิน 5 MB</div>
+                            <div class="dropzone-box" data-dropzone>
+                                <i class="fa-solid fa-cloud-arrow-up fs-2 text-primary mb-2"></i>
+                                <p class="mb-2 small text-muted">ลากไฟล์สลิปมาวางที่นี่ หรือเลือกไฟล์จากเครื่อง (JPG/PNG ไม่เกิน 5 MB)</p>
+                                <input id="proofFile" name="proofFile" type="file" class="form-control" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
+                                <div class="d-none mt-3" data-dropzone-preview>
+                                    <img data-dropzone-img src="" alt="ตัวอย่างสลิป" class="img-fluid rounded-3 border shadow-sm" style="max-height: 220px;" />
+                                    <div class="small text-success fw-semibold mt-2" data-dropzone-filename></div>
+                                </div>
+                            </div>
                         </div>
                         <div asp-validation-summary="All" class="text-danger mb-3"></div>
                         <button class="btn btn-success fw-bold" type="submit">ส่งหลักฐานให้ฝ่ายการเงิน</button>

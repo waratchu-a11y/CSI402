@@ -151,7 +151,7 @@ namespace warat_0583_l005.Controllers
         }
 
         [HttpPost]
-        public IActionResult Register(RegisterViewModel model)
+        public async Task<IActionResult> Register(RegisterViewModel model)
         {
             if (ModelState.IsValid)
             {
@@ -174,6 +174,39 @@ namespace warat_0583_l005.Controllers
 
                     _db.Add(newUser);
                     _db.SaveChanges();
+
+                    _db.Add(new LoginHistoryModel
+                    {
+                        UserId = newUser.Id,
+                        Username = newUser.Username!,
+                        Email = string.IsNullOrEmpty(newUser.Email) ? "-" : newUser.Email,
+                        LoggedInAtUtc = DateTime.Now
+                    });
+                    _db.SaveChanges();
+
+                    var claims = new List<Claim>
+                    {
+                        new(ClaimTypes.Name, newUser.Username!),
+                        new(ClaimTypes.Role, newUser.Role ?? "Customer"),
+                        new(ClaimTypes.NameIdentifier, newUser.Id.ToString())
+                    };
+                    var identity = new ClaimsIdentity(claims, "Cookies");
+                    await HttpContext.SignInAsync(
+                        "Cookies",
+                        new ClaimsPrincipal(identity),
+                        new Microsoft.AspNetCore.Authentication.AuthenticationProperties
+                        {
+                            IsPersistent = true,
+                            ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
+                        });
+
+                    Response.Cookies.Append("Username", newUser.Username!, new CookieOptions
+                    {
+                        Expires = DateTimeOffset.UtcNow.AddHours(8),
+                        HttpOnly = true,
+                        SameSite = SameSiteMode.Lax,
+                        Secure = Request.IsHttps
+                    });
 
                     return RedirectToAction("Indexcustomer", "Home");
                 }

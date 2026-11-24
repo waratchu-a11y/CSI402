@@ -7,25 +7,51 @@
     var readyForPickupBookingIds = (HashSet<int>)ViewBag.ReadyForPickupBookingIds;
 }
 
-<div class="container my-5">
-    <h2 class="fw-bold mb-3">คิวงานรับ-คืนรถ</h2>
+<div class="container py-4 py-lg-5">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div>
+            <h1 class="h2 fw-bold mb-1"><i class="fa-solid fa-clipboard-check text-primary me-2"></i>คิวงานรับ-คืนรถ</h1>
+            <p class="text-muted mb-0">ตรวจสอบใบขับขี่ ส่งมอบรถ และตรวจรับรถคืนจากลูกค้า</p>
+        </div>
+        <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-2 fs-6">
+            <i class="fa-solid fa-list-check me-1"></i>ทั้งหมด @Model.Count() รายการ
+        </span>
+    </div>
     @if (TempData["OperationsMessage"] is string message)
     {
         <div class="alert alert-success">@message</div>
     }
     @foreach (var booking in Model)
     {
-        <div class="card shadow-sm mb-4">
-            <div class="card-header d-flex justify-content-between">
-                <strong>Booking #@booking.BookingId — @booking.CarModel</strong>
-                <span>
-                    @(booking.BookingStatus == "return_requested" ? "ลูกค้าแจ้งคืนรถแล้ว" : booking.BookingStatus)
-                    / ใบขับขี่: @booking.LicenseStatus
-                </span>
+        var statusBadge = booking.BookingStatus switch
+        {
+            "confirmed" => "bg-primary-subtle text-primary",
+            "rented" => "bg-info-subtle text-info-emphasis",
+            "return_requested" => "bg-warning-subtle text-warning-emphasis",
+            _ => "bg-secondary-subtle text-secondary"
+        };
+        var licenseBadge = booking.LicenseStatus switch
+        {
+            "approved" => "bg-success-subtle text-success",
+            "rejected" => "bg-danger-subtle text-danger",
+            _ => "bg-warning-subtle text-warning-emphasis"
+        };
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <strong><i class="fa-solid fa-car-side text-primary me-2"></i>Booking #@booking.BookingId — @booking.CarModel</strong>
+                <div class="d-flex gap-2 flex-wrap">
+                    <span class="badge @statusBadge rounded-pill">@(booking.BookingStatus == "return_requested" ? "ลูกค้าแจ้งคืนรถแล้ว" : booking.BookingStatus)</span>
+                    <span class="badge @licenseBadge rounded-pill">ใบขับขี่: @booking.LicenseStatus</span>
+                </div>
             </div>
             <div class="card-body">
                 <p class="mb-2">ลูกค้า: @booking.UserId | รับ @booking.PickupDate @booking.PickupTime — คืน @booking.ReturnDate?.ToString("yyyy-MM-dd") @booking.ReturnTime</p>
-                <a asp-controller="Payment" asp-action="License" asp-route-bookingId="@booking.BookingId" target="_blank" rel="noopener">เปิดรูปใบขับขี่</a>
+                <a href="@Url.Action("License", "Payment", new { bookingId = booking.BookingId })"
+                   data-lightbox-src="@Url.Action("License", "Payment", new { bookingId = booking.BookingId })"
+                   data-lightbox-title="ใบขับขี่ — Booking #@booking.BookingId (@booking.UserId)"
+                   class="btn btn-sm btn-outline-primary">
+                    <i class="fa-solid fa-id-card me-1"></i>ดูรูปใบขับขี่
+                </a>
                 @if (booking.LicenseStatus == "rejected" && !string.IsNullOrWhiteSpace(booking.LicenseReviewNote))
                 {
                     <p class="text-danger mt-2 mb-0">เหตุผลที่ไม่ผ่าน: @booking.LicenseReviewNote</p>
@@ -46,9 +72,12 @@
                         <div class="d-flex flex-wrap gap-2 mt-2">
                             @for (int imageIndex = 0; imageIndex < returnImages.Length; imageIndex++)
                             {
-                                <a asp-controller="Payment" asp-action="ReturnPhoto"
-                                   asp-route-bookingId="@booking.BookingId" asp-route-imageIndex="@imageIndex"
-                                   target="_blank" rel="noopener">เปิดรูปที่ @(imageIndex + 1)</a>
+                                <a href="@Url.Action("ReturnPhoto", "Payment", new { bookingId = booking.BookingId, imageIndex })"
+                                   data-lightbox-src="@Url.Action("ReturnPhoto", "Payment", new { bookingId = booking.BookingId, imageIndex })"
+                                   data-lightbox-title="รูปรถคืนที่ @(imageIndex + 1) — Booking #@booking.BookingId"
+                                   class="btn btn-sm btn-outline-dark">
+                                    <i class="fa-solid fa-image me-1"></i>ดูรูปที่ @(imageIndex + 1)
+                                </a>
                             }
                         </div>
                     </div>

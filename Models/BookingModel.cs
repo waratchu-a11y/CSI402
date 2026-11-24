@@ -88,5 +88,17 @@ namespace warat_0583_l005.Models
 
         [Column("ReturnSubmittedAt")]
         public DateTime? ReturnSubmittedAt { get; set; }
+
+        [Column("RefundBankName")]
+        public string? RefundBankName { get; set; }
+
+        [Column("RefundAccountName")]
+        public string? RefundAccountName { get; set; }
+
+        [Column("RefundAccountNumber")]
+        public string? RefundAccountNumber { get; set; }
+
+        [Column("RefundPhone")]
+        public string? RefundPhone { get; set; }
     }
 }

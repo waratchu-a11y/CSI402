@@ -41,21 +41,21 @@
             <!-- กล่องไฮไลต์ฟีเจอร์ -->
             <div class="row g-3 mt-4">
                 <div class="col-4">
-                    <div class="card p-3 text-center border-0 shadow-sm" style="border-radius: 15px;">
+                    <div class="card feature-card p-3 text-center h-100">
                         <i class="fa-solid fa-shield-halved text-primary fs-3 mb-2"></i>
                         <h6 class="fw-bold mb-0">ประกันภัยชั้น 1</h6>
                         <small class="text-muted">คุ้มครองครบครัน</small>
                     </div>
                 </div>
                 <div class="col-4">
-                    <div class="card p-3 text-center border-0 shadow-sm" style="border-radius: 15px;">
+                    <div class="card feature-card p-3 text-center h-100">
                         <i class="fa-solid fa-road text-primary fs-3 mb-2"></i>
                         <h6 class="fw-bold mb-0">ไม่จำกัดระยะทาง</h6>
-                        <small class="text-muted">ขับ Loei ทั่วไทย</small>
+                        <small class="text-muted">ขับขี่ได้ทั่วไทย</small>
                     </div>
                 </div>
                 <div class="col-4">
-                    <div class="card p-3 text-center border-0 shadow-sm" style="border-radius: 15px;">
+                    <div class="card feature-card p-3 text-center h-100">
                         <i class="fa-solid fa-headset text-primary fs-3 mb-2"></i>
                         <h6 class="fw-bold mb-0">Support 24 ชม.</h6>
                         <small class="text-muted">ช่วยเหลือฉุกเฉิน</small>
@@ -99,11 +99,41 @@
                     <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> เงื่อนไข: ผู้เช่าต้องมีอายุ 20 ปีขึ้นไป และใช้ใบขับขี่ในการรับรถ
                 </div>
 
+                @if (isAvailable && hasLocation)
+                {
+                    <div class="bg-light border rounded-4 p-3 mb-4" id="priceEstimator" data-price-per-day="@Model.PricePerDay">
+                        <div class="fw-bold small text-secondary mb-2"><i class="fa-solid fa-calculator text-primary me-1"></i> คำนวณราคาเบื้องต้น</div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small mb-1" for="estPickup">วันรับรถ</label>
+                                <input id="estPickup" type="date" class="form-control form-control-sm"
+                                       min="@DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)"
+                                       value="@DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-1" for="estReturn">วันคืนรถ</label>
+                                <input id="estReturn" type="date" class="form-control form-control-sm"
+                                       min="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)"
+                                       value="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" />
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="text-muted">ระยะเวลาเช่า (<span id="estDays">1</span> วัน)</span>
+                            <strong id="estTotal">฿@Model.PricePerDay.ToString("N0")</strong>
+                        </div>
+                        <div class="d-flex justify-content-between small text-primary">
+                            <span>มัดจำ 10% เมื่อยืนยันจอง</span>
+                            <strong id="estDeposit">฿@((Model.PricePerDay * 0.10m).ToString("N0"))</strong>
+                        </div>
+                    </div>
+                }
+
                 <!-- ปุ่มกดดำเนินการจอง -->
                 <div class="d-grid gap-2">
                     @if (isAvailable && hasLocation)
                     {
-                        <a asp-controller="Account" asp-action="Lab52"
+                        <a id="detailBookBtn"
+                           asp-controller="Account" asp-action="Lab52"
                            asp-route-CarModel="@Model.CarName"
                            asp-route-PickupLocation="@Model.Location"
                            asp-route-PricePerDay="@Model.PricePerDay"
@@ -122,3 +152,52 @@
         </div>
     </div>
 </div>
+
+@if (isAvailable && hasLocation)
+{
+    <script>
+        (() => {
+            const estimator = document.getElementById('priceEstimator');
+            const pickup = document.getElementById('estPickup');
+            const returned = document.getElementById('estReturn');
+            const daysEl = document.getElementById('estDays');
+            const totalEl = document.getElementById('estTotal');
+            const depositEl = document.getElementById('estDeposit');
+            const bookBtn = document.getElementById('detailBookBtn');
+            if (!estimator || !pickup || !returned || !bookBtn) return;
+
+            const pricePerDay = parseFloat(estimator.dataset.pricePerDay || '0');
+            const baseHref = bookBtn.getAttribute('href') || '';
+
+            function recalculate() {
+                if (!pickup.value) return;
+                const pDate = new Date(`${pickup.value}T00:00:00Z`);
+                const minR = new Date(pDate);
+                minR.setUTCDate(minR.getUTCDate() + 1);
+                returned.min = minR.toISOString().slice(0, 10);
+                if (!returned.value || returned.value < returned.min) {
+                    returned.value = returned.min;
+                }
+                const rDate = new Date(`${returned.value}T00:00:00Z`);
+                const days = Math.max(1, Math.round((rDate - pDate) / 86400000));
+                const total = days * pricePerDay;
+                const deposit = total * 0.10;
+
+                daysEl.textContent = days;
+                totalEl.textContent = `฿${Math.round(total).toLocaleString('en-US')}`;
+                depositEl.textContent = `฿${Math.round(deposit).toLocaleString('en-US')}`;
+
+                const url = new URL(baseHref, window.location.origin);
+                url.searchParams.set('PickupDate', pickup.value);
+                url.searchParams.set('ReturnDate', returned.value);
+                url.searchParams.set('RentalDays', days);
+                url.searchParams.set('TotalPrice', total);
+                bookBtn.setAttribute('href', url.pathname + url.search);
+            }
+
+            pickup.addEventListener('change', recalculate);
+            returned.addEventListener('change', recalculate);
+            recalculate();
+        })();
+    </script>
+}

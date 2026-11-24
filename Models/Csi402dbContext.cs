@@ -119,6 +119,10 @@ public Csi402dbContext(DbContextOptions<Csi402dbContext> options)
             entity.Property(e => e.ReturnMileage);
             entity.Property(e => e.ReturnImagePaths).HasMaxLength(500);
             entity.Property(e => e.ReturnSubmittedAt).HasColumnType("datetime");
+            entity.Property(e => e.RefundBankName).HasMaxLength(100);
+            entity.Property(e => e.RefundAccountName).HasMaxLength(150);
+            entity.Property(e => e.RefundAccountNumber).HasMaxLength(30);
+            entity.Property(e => e.RefundPhone).HasMaxLength(20);
             entity.HasIndex(e => e.CarId);
             entity.HasOne<CarModel>().WithMany().HasForeignKey(e => e.CarId).OnDelete(DeleteBehavior.Restrict);
         });

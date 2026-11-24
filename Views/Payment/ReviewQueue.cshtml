@@ -9,18 +9,24 @@
     var cancellationRefunds = Model.Where(payment => payment.PaymentType == "refund").ToList();
 }
 
-<div class="container my-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0">ฝ่ายการเงิน — ตรวจสอบการชำระเงิน</h2>
-        <a asp-action="History" class="btn btn-outline-primary">ประวัติการเงิน</a>
+<div class="container py-4 py-lg-5">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div>
+            <h1 class="h2 fw-bold mb-1"><i class="fa-solid fa-money-check-dollar text-primary me-2"></i>ฝ่ายการเงิน — ตรวจสอบการชำระเงิน</h1>
+            <p class="text-muted mb-0">อนุมัติสลิปโอนเงิน จัดการคำขอคืนเงิน และบันทึกการคืนมัดจำ</p>
+        </div>
+        <a asp-action="History" class="btn btn-outline-primary rounded-pill px-4"><i class="fa-solid fa-clock-rotate-left me-1"></i>ประวัติการเงิน</a>
     </div>
     @if (TempData["PaymentMessage"] is string message)
     {
         <div class="alert alert-info">@message</div>
     }
 
-    <div class="card shadow-sm mb-5">
-        <div class="card-header fw-bold">หลักฐานโอนที่รอตรวจ</div>
+    <div class="card mb-4">
+        <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+            <span><i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i>หลักฐานโอนที่รอตรวจ</span>
+            <span class="badge bg-primary-subtle text-primary rounded-pill">@pendingPayments.Count รายการ</span>
+        </div>
         <div class="table-responsive">
             <table class="table align-middle mb-0">
                 <thead><tr><th>รายการ</th><th>ลูกค้า / รถ</th><th>ยอด</th><th>หลักฐาน</th><th>การตรวจสอบ</th></tr></thead>
@@ -30,12 +36,24 @@
                     if (!bookings.TryGetValue(payment.BookingId, out var booking)) { continue; }
                     <tr>
                         <td>#@payment.PaymentId / Booking #@booking.BookingId<br /><small>@payment.CreatedAt.ToString("g")</small><br /><small>@(payment.PaymentType == "deposit" ? "มัดจำ" : "ค่าเช่า")</small></td>
-                        <td>@booking.UserId<br />@booking.CarModel<br /><a asp-action="License" asp-route-bookingId="@booking.BookingId">ดูใบขับขี่</a></td>
+                        <td>@booking.UserId<br />@booking.CarModel<br />
+                            <a href="@Url.Action("License", "Payment", new { bookingId = booking.BookingId })"
+                               data-lightbox-src="@Url.Action("License", "Payment", new { bookingId = booking.BookingId })"
+                               data-lightbox-title="ใบขับขี่ — Booking #@booking.BookingId (@booking.UserId)"
+                               class="btn btn-sm btn-outline-secondary mt-1">
+                                <i class="fa-solid fa-id-card me-1"></i>ดูใบขับขี่
+                            </a>
+                        </td>
                         <td>฿@payment.Amount.ToString("N2")<br /><small>@payment.ReferenceNumber</small></td>
                         <td>
                             @if (payment.ProofFileName is not null)
                             {
-                                <a asp-action="Proof" asp-route-paymentId="@payment.PaymentId" target="_blank" rel="noopener">เปิดสลิป</a>
+                                <a href="@Url.Action("Proof", "Payment", new { paymentId = payment.PaymentId })"
+                                   data-lightbox-src="@Url.Action("Proof", "Payment", new { paymentId = payment.PaymentId })"
+                                   data-lightbox-title="สลิปโอนเงิน #@payment.PaymentId (Booking #@booking.BookingId)"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fa-solid fa-image me-1"></i>ดูสลิป
+                                </a>
                             }
                         </td>
                         <td>
@@ -94,13 +112,19 @@
         <div class="card-header fw-bold">รายการคืนรถที่พร้อมคืนมัดจำ</div>
         <div class="table-responsive">
             <table class="table align-middle mb-0">
-                <thead><tr><th>Booking</th><th>ลูกค้า / รถ</th><th>มัดจำ</th><th>คืนเงินผ่านโอน</th></tr></thead>
+                <thead><tr><th>Booking</th><th>ลูกค้า / รถ</th><th>ข้อมูลบัญชีลูกค้า</th><th>มัดจำ</th><th>คืนเงินผ่านโอน</th></tr></thead>
                 <tbody>
                 @foreach (var booking in refundableBookings)
                 {
                     <tr>
                         <td>#@booking.BookingId</td>
                         <td>@booking.UserId / @booking.CarModel</td>
+                        <td>
+                            <div><strong>@(booking.RefundBankName ?? "-")</strong></div>
+                            <div>@(booking.RefundAccountName ?? "-")</div>
+                            <div>เลขบัญชี: @(booking.RefundAccountNumber ?? "-")</div>
+                            <div>โทร: @(booking.RefundPhone ?? "-")</div>
+                        </td>
                         <td>฿@booking.DepositAmount.ToString("N2")</td>
                         <td>
                             <form asp-action="CompleteRefund" method="post" class="d-flex gap-2">
@@ -113,7 +137,7 @@
                 }
                 @if (refundableBookings.Count == 0)
                 {
-                    <tr><td colspan="4" class="text-center text-muted py-4">ไม่มีรายการคืนมัดจำที่รอดำเนินการ</td></tr>
+                    <tr><td colspan="5" class="text-center text-muted py-4">ไม่มีรายการคืนมัดจำที่รอดำเนินการ</td></tr>
                 }
                 </tbody>
             </table>

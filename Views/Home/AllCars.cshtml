@@ -12,9 +12,12 @@
 }
 
 <!-- แถบ Header ของหน้าเพจ -->
-<div class="bg-primary text-white py-4 shadow-sm mb-5" style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
-    <div class="container">
-        <h2 class="fw-bold mb-1"><i class="fa-solid fa-cars me-2"></i> ค้นหารถที่ใช่สำหรับคุณ</h2>
+<div class="page-hero">
+    <div class="container position-relative z-1">
+        <span class="badge bg-warning text-dark rounded-pill px-3 py-1 mb-2 fw-semibold">
+            <i class="fa-solid fa-car-side me-1"></i> คลังรถยนต์คุณภาพ
+        </span>
+        <h2 class="fw-bold mb-1"><i class="fa-solid fa-car me-2"></i> ค้นหารถที่ใช่สำหรับคุณ</h2>
         <p class="text-white-50 m-0">เลือกรถเช่าหลากหลายรุ่นที่ตอบโจทย์ทุกการเดินทาง พร้อมข้อเสนอสุดพิเศษ</p>
     </div>
 </div>
@@ -78,15 +81,32 @@
 
         <!-- ฝั่งขวา: แสดงรายการรถยนต์ -->
         <div class="col-lg-9">
-            <!-- แถบจัดเรียง -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <span class="text-muted">@(searchPerformed ? "พบรถทั้งหมด" : "พบรถยนต์ทั้งหมด") <strong>@(Model?.Count() ?? 0)</strong> คัน</span>
-                <!-- 📌 ใส่ id และ onchange เพื่อให้สคริปต์ทำงาน -->
-                <select id="sortSelect" class="form-select form-select-sm w-auto shadow-sm" style="border-radius: 8px;" onchange="sortCars()">
-                    <option value="default">เรียงตาม: แนะนำ</option>
-                    <option value="asc">เรียงตาม: ราคา (ต่ำไปสูง)</option>
-                    <option value="desc">เรียงตาม: ราคา (สูงไปต่ำ)</option>
-                </select>
+            <!-- แถบจัดเรียงและกรองด่วน -->
+            <div class="card p-3 mb-4">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-5">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
+                            <input type="text" id="carSearchInput" class="form-control" placeholder="ค้นหาชื่อรุ่นรถ หรือจุดรับรถ..." oninput="filterAndSortCars()" />
+                        </div>
+                    </div>
+                    <div class="col-md-4 d-flex flex-wrap gap-1">
+                        <button type="button" class="filter-pill active" data-car-filter="all" onclick="setCarFilter(this, 'all')">ทั้งหมด</button>
+                        <button type="button" class="filter-pill" data-car-filter="available" onclick="setCarFilter(this, 'available')">เฉพาะรถว่าง</button>
+                        <button type="button" class="filter-pill" data-car-filter="automatic" onclick="setCarFilter(this, 'automatic')">ออโต้</button>
+                        <button type="button" class="filter-pill" data-car-filter="manual" onclick="setCarFilter(this, 'manual')">ธรรมดา</button>
+                    </div>
+                    <div class="col-md-3 text-md-end">
+                        <select id="sortSelect" class="form-select form-select-sm shadow-none" onchange="filterAndSortCars()">
+                            <option value="default">เรียงตาม: แนะนำ</option>
+                            <option value="asc">ราคา: ต่ำไปสูง</option>
+                            <option value="desc">ราคา: สูงไปต่ำ</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-2 small text-muted">
+                    แสดง <strong id="visibleCarCount">@(Model?.Count() ?? 0)</strong> จาก <strong>@(Model?.Count() ?? 0)</strong> คัน
+                </div>
             </div>
 
             <!-- Grid แสดงรถยนต์ (ใส่ id="carList" เพื่อให้สคริปต์จับกลุ่ม) -->
@@ -97,12 +117,23 @@
                     {
                         var isAvailable = car.Status == "ว่าง" && !unavailableCarIds.Contains(car.CarId);
                         var hasLocation = !string.IsNullOrWhiteSpace(car.Location);
-                        <div class="col-md-6 car-item" data-price="@car.PricePerDay">
+                        <div class="col-md-6 car-item"
+                             data-price="@car.PricePerDay"
+                             data-available="@(isAvailable ? "true" : "false")"
+                             data-transmission="@(car.TransmissionType ?? "")"
+                             data-search="@($"{car.CarName} {car.Location} {car.Details}".ToLowerInvariant())">
                             <div class="card h-100 shadow-sm car-card @(isAvailable ? "" : "opacity-75")" style="border-radius: 20px; border: none; overflow: hidden; transition: all 0.3s ease;">
                                 <a asp-controller="Home" asp-action="CarDetail" asp-route-carName="@car.CarName" class="position-relative overflow-hidden d-block" style="height: 200px;">
                                     <img src="@car.ImageUrl" class="card-img-top car-img" alt="@car.CarName" style="height: 100%; object-fit: cover; transition: transform 0.5s ease;" onerror="this.src='https://via.placeholder.com/400x220?text=No+Image';">
                                     <span class="badge @(isAvailable ? "bg-success" : "bg-danger") position-absolute top-0 end-0 m-3 px-3 py-2 shadow-sm rounded-pill z-1">
                                         <i class="fa-solid @(isAvailable ? "fa-circle-check" : "fa-circle-xmark") me-1"></i>@(isAvailable ? "ว่าง" : "ไม่ว่าง")
+                                    </span>
+                                    <span class="glass-spec-pill position-absolute bottom-0 start-0 m-3 z-1">
+                                        <i class="fa-solid fa-gears me-1"></i>@(car.TransmissionType == "manual" ? "ธรรมดา" : "ออโต้")
+                                        @if (car.Seats.HasValue)
+                                        {
+                                            <span class="ms-2"><i class="fa-solid fa-users me-1"></i>@car.Seats ที่นั่ง</span>
+                                        }
                                     </span>
                                 </a>
                                 <div class="card-body p-4">
@@ -187,27 +218,53 @@
     .book-btn:hover { background-color: #ffca2c !important; transform: scale(1.02); }
 </style>
 
-<!-- 📌 สคริปต์สำหรับจัดเรียงข้อมูลราคา -->
+<!-- 📌 สคริปต์สำหรับจัดเรียงและกรองข้อมูลรถ -->
 <script>
-    function sortCars() {
-        const select = document.getElementById('sortSelect');
-        const sortBy = select.value;
-        const container = document.getElementById('carList');
-        const items = Array.from(container.getElementsByClassName('car-item'));
+    let currentCarFilter = 'all';
 
+    function setCarFilter(button, filterValue) {
+        currentCarFilter = filterValue;
+        document.querySelectorAll('[data-car-filter]').forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        filterAndSortCars();
+    }
+
+    function filterAndSortCars() {
+        const select = document.getElementById('sortSelect');
+        const sortBy = select ? select.value : 'default';
+        const query = (document.getElementById('carSearchInput')?.value || '').trim().toLowerCase();
+        const container = document.getElementById('carList');
+        if (!container) return;
+
+        const items = Array.from(container.getElementsByClassName('car-item'));
         items.sort((a, b) => {
             const priceA = parseFloat(a.getAttribute('data-price'));
             const priceB = parseFloat(b.getAttribute('data-price'));
-
-            if (sortBy === 'asc') {
-                return priceA - priceB; // ราคาต่ำไปสูง
-            } else if (sortBy === 'desc') {
-                return priceB - priceA; // ราคาสูงไปต่ำ
-            } else {
-                return 0; // ค่าเริ่มต้น (แนะนำ)
-            }
+            if (sortBy === 'asc') return priceA - priceB;
+            if (sortBy === 'desc') return priceB - priceA;
+            return 0;
         });
 
-        items.forEach(item => container.appendChild(item));
+        let visibleCount = 0;
+        items.forEach(item => {
+            container.appendChild(item);
+            const isAvailable = item.getAttribute('data-available') === 'true';
+            const transmission = item.getAttribute('data-transmission') || '';
+            const searchText = item.getAttribute('data-search') || '';
+
+            const matchesFilter =
+                currentCarFilter === 'all' ||
+                (currentCarFilter === 'available' && isAvailable) ||
+                (currentCarFilter === 'automatic' && transmission === 'automatic') ||
+                (currentCarFilter === 'manual' && transmission === 'manual');
+
+            const matchesSearch = !query || searchText.includes(query);
+            const show = matchesFilter && matchesSearch;
+            item.classList.toggle('d-none', !show);
+            if (show) visibleCount++;
+        });
+
+        const countEl = document.getElementById('visibleCarCount');
+        if (countEl) countEl.textContent = visibleCount;
     }
 </script>

@@ -37,11 +37,14 @@
     }
 
     <!-- ตารางแสดงรายการรถ -->
-    <div class="card shadow-sm border-0" style="border-radius: 15px; overflow: hidden;">
+    <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0"><i class="fa-solid fa-list text-primary me-2"></i>รายการรถยนต์ทั้งหมด (@(Model?.Count() ?? 0) คัน)</h5>
+        </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover align-middle m-0">
-                    <thead class="table-dark">
+                    <thead>
                         <tr>
                             <th class="py-3 px-4">รูปภาพ</th>
                             <th class="py-3">ชื่อรุ่นรถยนต์</th>
@@ -90,7 +93,7 @@
                                                 data-edit-target="edit-car-@car.CarId">
                                             <i class="fa-solid fa-pen-to-square"></i> แก้ไข
                                         </button>
-                                        <form asp-action="DeleteCar" method="post" class="d-inline" onsubmit="return confirm('ยืนยันลบรถคันนี้หรือไม่?');">
+                                        <form asp-action="DeleteCar" method="post" class="d-inline" data-confirm="ยืนยันลบรถ @car.CarName หรือไม่? การลบไม่สามารถย้อนกลับได้">
                                             <input type="hidden" name="id" value="@car.CarId" />
                                             <button type="submit" class="btn btn-sm btn-outline-danger fw-bold"><i class="fa-solid fa-trash"></i> ลบ</button>
                                         </form>
